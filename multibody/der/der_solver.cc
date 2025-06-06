@@ -1,5 +1,7 @@
 #include "drake/multibody/der/der_solver.h"
 
+#include <algorithm>
+
 namespace drake {
 namespace multibody {
 namespace der {
@@ -83,6 +85,25 @@ int DerSolver<T>::AdvanceOneTimeStep(
 }
 
 template <typename T>
+void DerSolver<T>::ComputeTangentMatrixSchurComplement(
+    const std::unordered_set<int>& participating_dofs) {
+  DRAKE_THROW_UNLESS(std::all_of(participating_dofs.begin(),
+                                 participating_dofs.end(), [&](int dof) {
+                                   return 0 <= dof && dof < model_->num_dofs();
+                                 }));
+  DerState<T>& state = *state_;
+  typename DerModel<T>::Scratch* der_model_scratch =
+      scratch_.der_model_scratch.get();
+  DRAKE_DEMAND(der_model_scratch != nullptr);
+
+  const internal::Block4x4SparseSymmetricMatrix<T>& tangent_matrix =
+      model_->ComputeTangentMatrix(state, integrator_->GetWeights(),
+                                   der_model_scratch);
+  tangent_matrix_schur_complement_ =
+      ComputeSchurComplement(tangent_matrix, participating_dofs);
+}
+
+template <typename T>
 void DerSolver<T>::set_state(const DerState<T>& state) {
   model_->ValidateDerState(state);
   state_->CopyFrom(state);
@@ -110,15 +131,18 @@ bool DerSolver<T>::solver_converged(const T& residual_norm,
 
 template <typename T>
 std::unique_ptr<DerSolver<T>> DerSolver<T>::Clone() const {
-  auto cloned = std::make_unique<DerSolver<T>>(this->model_, this->integrator_);
+  auto clone = std::make_unique<DerSolver<T>>(this->model_, this->integrator_);
   /* Copy the owned DerState. */
-  cloned->state_->CopyFrom(*this->state_);
+  clone->state_->CopyFrom(*this->state_);
+  /* Copy the owned SchurComplement. */
+  clone->tangent_matrix_schur_complement_ =
+      this->tangent_matrix_schur_complement_;
   /* Copy the solver parameters. */
-  cloned->relative_tolerance_ = this->relative_tolerance_;
-  cloned->absolute_tolerance_ = this->absolute_tolerance_;
-  cloned->max_iterations_ = this->max_iterations_;
+  clone->relative_tolerance_ = this->relative_tolerance_;
+  clone->absolute_tolerance_ = this->absolute_tolerance_;
+  clone->max_iterations_ = this->max_iterations_;
   /* Scratch variables do not need to be copied. */
-  return cloned;
+  return clone;
 }
 
 }  // namespace internal
