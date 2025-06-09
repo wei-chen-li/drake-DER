@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "drake/common/eigen_types.h"
+#include "drake/common/text_logging.h"
 #include "drake/geometry/geometry_ids.h"
 #include "drake/math/rigid_transform.h"
 #include "drake/multibody/contact_solvers/contact_configuration.h"
@@ -549,26 +550,26 @@ DeformableDriver<T>::ComputeContactDataForFilament(
              : geometry_pair.kinematic_weights_B()[k];
     const math::RotationMatrix<T> R_CW = geometry_pair.R_WCs()[k].transpose();
 
-    /* v_WGc = 𝑤₀ ẋᵢ + w₁ γ̇ⁱ + 𝑤₂ ẋᵢ₊₁.
-     If the a node or an edge is under BC, the corresponding jacobian block is
+    /* v_WGc = 𝑤₀ ẋᵢ + w₁ γ̇ⁱ + 𝑤₂ ẋᵢ₊₁. */
+    const T w0 = std::get<0>(kinematic_weights);
+    const Vector3<T> w1 = std::get<1>(kinematic_weights);
+    const T w2 = std::get<2>(kinematic_weights);
+    /* If the a node or an edge is under BC, the corresponding jacobian block is
      zero because the vertex doesn't contribute to the contact velocity. */
     if (!der_model.IsPositionFixed(index0)) {
-      v_WGc += std::get<0>(kinematic_weights) *
-               body_participating_v0.template segment<3>(permuted_dof0);
+      v_WGc += w0 * body_participating_v0.template segment<3>(permuted_dof0);
       scaled_Jv_v_WGc_C.template middleCols<3>(permuted_dof0) =
-          scale * std::get<0>(kinematic_weights) * R_CW.matrix();
+          scale * w0 * R_CW.matrix();
     }
     if (!der_model.IsPositionFixed(index1)) {
-      v_WGc +=
-          std::get<1>(kinematic_weights) * body_participating_v0[permuted_dof1];
+      v_WGc += w1 * body_participating_v0[permuted_dof1];
       scaled_Jv_v_WGc_C.template middleCols<1>(permuted_dof1) =
-          scale * (R_CW * std::get<1>(kinematic_weights));
+          scale * (R_CW * w1);
     }
     if (!der_model.IsPositionFixed(index2)) {
-      v_WGc += std::get<2>(kinematic_weights) *
-               body_participating_v0.template segment<3>(permuted_dof2);
+      v_WGc += w2 * body_participating_v0.template segment<3>(permuted_dof2);
       scaled_Jv_v_WGc_C.template middleCols<3>(permuted_dof2) =
-          scale * std::get<2>(kinematic_weights) * R_CW.matrix();
+          scale * w2 * R_CW.matrix();
     }
 
     result.v_WGc.emplace_back(v_WGc);
@@ -946,8 +947,9 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
 
       const T phi0 = geometry_pair.signed_distances()[i];
 
-      // const double default_stiffness = manager_->default_contact_stiffness();
-      const double default_stiffness = 1e12;
+      double default_stiffness = manager_->default_contact_stiffness();
+      if (default_stiffness == 0.0) default_stiffness = 1;
+      // TODO(wei-chen): Find a default stiffness from filaments.
       const T stiffness_A =
           GetPointContactStiffness(id_A, default_stiffness, inspector);
       const T stiffness_B =
