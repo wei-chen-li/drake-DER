@@ -16,7 +16,7 @@ namespace {
 template <typename T, int num_rows>
 Eigen::Matrix<T, num_rows, Eigen::Dynamic> Zero(int num_cols) {
   static_assert(num_rows > 0);
-  DRAKE_DEMAND(num_cols > 0);
+  DRAKE_DEMAND(num_cols >= 0);
   return Eigen::Matrix<T, num_rows, Eigen::Dynamic>::Zero(num_rows, num_cols);
 }
 
@@ -119,7 +119,7 @@ DerStateSystem<T>::DerStateSystem(
   DRAKE_THROW_UNLESS(ssize(initial_edge_angles_) == num_edges());
   DRAKE_THROW_UNLESS(num_edges() ==
                      (has_closed_ends_ ? num_nodes() : num_nodes() - 1));
-  DRAKE_THROW_UNLESS(num_edges() >= 2);
+  DRAKE_THROW_UNLESS(num_nodes() >= 2);
 
   auto q = AssembleQVector(initial_node_positions_, initial_edge_angles_);
   DRAKE_DEMAND(q.size() == num_dofs());
