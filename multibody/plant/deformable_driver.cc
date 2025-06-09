@@ -922,6 +922,16 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
         jacobian_blocks.push_back(std::move(contact_data_B.jacobian[i]));
       }
 
+      /* For self-contact the two Jacobian blocks must be summed together. */
+      if (jacobian_blocks.size() == 2 &&
+          jacobian_blocks[0].tree == jacobian_blocks[1].tree) {
+        TreeIndex tree = jacobian_blocks[0].tree;
+        const MatrixX<T> jacobian = jacobian_blocks[0].J.MakeDenseMatrix() +
+                                    jacobian_blocks[1].J.MakeDenseMatrix();
+        jacobian_blocks.clear();
+        jacobian_blocks.emplace_back(tree, MatrixBlock<T>(std::move(jacobian)));
+      }
+
       const math::RotationMatrix<T>& R_WC = geometry_pair.R_WCs()[i];
 
       const Vector3<T>& p_WC = geometry_pair.p_WCs()[i];
@@ -936,7 +946,8 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
 
       const T phi0 = geometry_pair.signed_distances()[i];
 
-      const double default_stiffness = manager_->default_contact_stiffness();
+      // const double default_stiffness = manager_->default_contact_stiffness();
+      const double default_stiffness = 1e12;
       const T stiffness_A =
           GetPointContactStiffness(id_A, default_stiffness, inspector);
       const T stiffness_B =

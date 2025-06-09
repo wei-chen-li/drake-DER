@@ -13,12 +13,12 @@ DEFINE_double(simulation_time, 5.0, "Desired duration of the simulation [s].");
 DEFINE_double(realtime_rate, 1.0, "Desired real time rate.");
 DEFINE_double(time_step, 1e-3,
               "Discrete time step for the system [s]. Must be positive.");
-DEFINE_double(E, 4e6, "Young's modulus of the filaments [Pa].");
-DEFINE_double(G, 2e6, "Shear modulus of the filaments [Pa].");
-DEFINE_double(rho, 0.5, "Mass density of the filaments [kg/m³].");
+DEFINE_double(E, 4e4, "Young's modulus of the filaments [Pa].");
+DEFINE_double(G, 2e4, "Shear modulus of the filaments [Pa].");
+DEFINE_double(rho, 5, "Mass density of the filaments [kg/m³].");
 DEFINE_double(diameter, 0.015, "Diameter of the filaments [m].");
 DEFINE_double(cylinder_diameter, 0.05, "Diameter of the cylinder [m].");
-DEFINE_int32(num_edges, 30,
+DEFINE_int32(num_edges, 101,
              "Number of edges the filaments are spatially discretized.");
 DEFINE_string(contact_approximation, "lagged",
               "Type of convex contact approximation. See "
