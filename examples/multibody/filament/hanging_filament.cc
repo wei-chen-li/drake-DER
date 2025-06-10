@@ -105,19 +105,6 @@ DeformableBodyId RegisterFilament(DeformableModel<double>* deformable_model,
   return body_id;
 }
 
-void RegisterCylinder(MultibodyPlant<double>* plant) {
-  const RigidBody<double>& cylinder = plant->AddRigidBody("cylinder");
-  plant->WeldFrames(plant->world_frame(), cylinder.body_frame(),
-                    RigidTransformd(RotationMatrixd::MakeXRotation(M_PI / 2),
-                                    Vector3d::Zero()));
-  plant->RegisterVisualGeometry(cylinder, RigidTransformd::Identity(),
-                                Cylinder(FLAGS_cylinder_diameter / 2, 0.3),
-                                "cylinder", Vector4d(0.2, 0.2, 0.6, 1.0));
-  plant->RegisterCollisionGeometry(cylinder, RigidTransformd::Identity(),
-                                   Cylinder(FLAGS_cylinder_diameter / 2, 0.3),
-                                   "cylinder", CoulombFriction(0.8, 0.8));
-}
-
 int do_main() {
   systems::DiagramBuilder<double> builder;
 
@@ -127,7 +114,8 @@ int do_main() {
 
   auto [plant, scene_graph] = AddMultibodyPlant(plant_config, &builder);
   DeformableModel<double>& deformable_model = plant.mutable_deformable_model();
-  RegisterCylinder(&plant);
+  RegisterFilament(&deformable_model, Vector3d(0, -0.5, 0), Vector3d(0, 0.5, 0),
+                   true);
   const double z = (FLAGS_diameter / 2) + FLAGS_cylinder_diameter;
   RegisterFilament(&deformable_model, Vector3d(-0.5, 0, z),
                    Vector3d(0.5, 0, z));

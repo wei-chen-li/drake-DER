@@ -948,7 +948,7 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
       const T phi0 = geometry_pair.signed_distances()[i];
 
       double default_stiffness = manager_->default_contact_stiffness();
-      if (default_stiffness == 0.0) default_stiffness = 1;
+      if (default_stiffness == 0.0) default_stiffness = 1e5;
       // TODO(wei-chen): Find a default stiffness from filaments.
       const T stiffness_A =
           GetPointContactStiffness(id_A, default_stiffness, inspector);
