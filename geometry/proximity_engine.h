@@ -138,7 +138,8 @@ class ProximityEngine {
    @param filament  The filament to add.
    @param id        The id of the geometry in SceneGraph to which this filament
                     belongs. */
-  void AddFilamentGeometry(const Filament& filament, GeometryId id);
+  void AddFilamentGeometry(const Filament& filament, GeometryId id,
+                           const ProximityProperties& props = {});
 
   /* Reports if the engine requires a convex hull for the given geometry. */
   bool NeedsConvexHull(const InternalGeometry& geometry) const;

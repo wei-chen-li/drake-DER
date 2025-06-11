@@ -368,6 +368,7 @@ drake_cc_library(
     deps = [
         ":collision_filter",
         "//geometry:geometry_ids",
+        "//geometry:geometry_roles",
         "//geometry:shape_specification",
         "//geometry/query_results:filament_contact",
     ],

@@ -1268,7 +1268,8 @@ void GeometryState<T>::AssignRole(SourceId source_id, GeometryId geometry_id,
       } else if (geometry.is_deformable() &&
                  geometry.reference_filament() != nullptr) {
         const Filament& reference_filament = *geometry.reference_filament();
-        geometry_engine_->AddFilamentGeometry(reference_filament, geometry_id);
+        geometry_engine_->AddFilamentGeometry(reference_filament, geometry_id,
+                                              *geometry.proximity_properties());
       } else if (geometry.is_dynamic()) {
         // Pass the geometry to the engine.
         const RigidTransformd& X_WG =
@@ -1999,7 +2000,8 @@ void GeometryState<T>::AddToProximityEngineUnchecked(
   } else if (geometry.is_deformable() &&
              geometry.reference_filament() != nullptr) {
     const Filament& reference_filament = *geometry.reference_filament();
-    geometry_engine_->AddFilamentGeometry(reference_filament, geometry_id);
+    geometry_engine_->AddFilamentGeometry(reference_filament, geometry_id,
+                                          *geometry.proximity_properties());
   } else if (geometry.is_dynamic()) {
     // Pass the geometry to the engine.
     const RigidTransformd& X_WG =

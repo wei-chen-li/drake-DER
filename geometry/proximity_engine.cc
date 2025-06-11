@@ -377,8 +377,9 @@ class ProximityEngine<T>::Impl : public ShapeReifier {
     collision_filter_.AddGeometry(id);
   }
 
-  void AddFilamentGeometry(const Filament& filament, GeometryId id) {
-    filament_geometries_.AddFilamentGeometry(id, filament);
+  void AddFilamentGeometry(const Filament& filament, GeometryId id,
+                           const ProximityProperties& props) {
+    filament_geometries_.AddFilamentGeometry(id, filament, props);
     collision_filter_.AddGeometry(id);
   }
 
@@ -430,15 +431,16 @@ class ProximityEngine<T>::Impl : public ShapeReifier {
     // be affected by its proximity properties are its hydroelastic
     // representation and rigid (non-deformable) representation for deformable
     // contact.
-    if (!IsRegisteredAsDeformable(id) && !IsRegisteredAsRigid(id)) {
+    if (!IsRegisteredAsDeformable(id) && !IsRegisteredAsFilament(id) &&
+        !IsRegisteredAsRigid(id)) {
       throw std::logic_error(
           fmt::format("The proximity engine does not contain a geometry with "
                       "the id {}; its properties cannot be updated",
                       id));
     }
-    if (IsRegisteredAsDeformable(id) || IsRegisteredAsFilament(id)) {
-      // Since deformable geometries and filament geometries currently don't
-      // depend on proximity properties for anything we simply return.
+    if (IsRegisteredAsDeformable(id)) {
+      // Since deformable geometries currently don't depend on proximity
+      // properties for anything we simply return.
       return;
     }
     // TODO(SeanCurtis-TRI): Precondition this with a test -- currently,
@@ -447,6 +449,13 @@ class ProximityEngine<T>::Impl : public ShapeReifier {
     //  one -- even it doesn't actually change. Such an optimization probably
     //  has limited value as this type of operation would really only be done
     //  at initialization.
+
+    if (IsRegisteredAsFilament(id)) {
+      filament_geometries_.RemoveGeometry(id);
+      const Filament* filament = geometry.reference_filament();
+      DRAKE_THROW_UNLESS(filament != nullptr);
+      filament_geometries_.AddFilamentGeometry(id, *filament, new_properties);
+    }
 
     // We'll simply mindlessly destroy and recreate the hydroelastic and
     // deformable contact representations of rigid (non-deformable)
@@ -1371,8 +1380,9 @@ void ProximityEngine<T>::AddDeformableGeometry(
 
 template <typename T>
 void ProximityEngine<T>::AddFilamentGeometry(const Filament& filament,
-                                             GeometryId id) {
-  impl_->AddFilamentGeometry(filament, id);
+                                             GeometryId id,
+                                             const ProximityProperties& props) {
+  impl_->AddFilamentGeometry(filament, id, props);
 }
 
 template <typename T>

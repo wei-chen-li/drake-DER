@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "drake/geometry/geometry_ids.h"
+#include "drake/geometry/geometry_roles.h"
 #include "drake/geometry/proximity/collision_filter.h"
 #include "drake/geometry/query_results/filament_contact.h"
 #include "drake/geometry/shape_specification.h"
@@ -29,7 +30,8 @@ class Geometries {
    @param filament  The filament with information on number of nodes and edges,
                     and cross-section.
    @pre There is no previous geometry associated with `id`. */
-  void AddFilamentGeometry(GeometryId id, const Filament& filament);
+  void AddFilamentGeometry(GeometryId id, const Filament& filament,
+                           const ProximityProperties& props);
 
   /* Removes the geometry specified by `id`. No-op if no geometry exist with the
    provided `id`. */

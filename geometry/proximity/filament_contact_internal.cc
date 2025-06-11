@@ -313,7 +313,10 @@ class Geometries::Impl {
  public:
   Impl() = default;
 
-  void AddFilamentGeometry(GeometryId id, const Filament& filament) {
+  void AddFilamentGeometry(GeometryId id, const Filament& filament,
+                           const ProximityProperties& props) {
+    unused(props);
+
     DRAKE_THROW_UNLESS(!is_filament(id));
     const Eigen::Matrix3Xd& node_pos = filament.node_pos();
     const Eigen::Matrix3Xd& edge_m1 = filament.edge_m1();
@@ -564,9 +567,10 @@ Geometries& Geometries::operator=(Geometries&& other) = default;
 
 Geometries::~Geometries() = default;
 
-void Geometries::AddFilamentGeometry(GeometryId id, const Filament& filament) {
+void Geometries::AddFilamentGeometry(GeometryId id, const Filament& filament,
+                                     const ProximityProperties& props) {
   DRAKE_DEMAND(impl_ != nullptr);
-  impl_->AddFilamentGeometry(id, filament);
+  impl_->AddFilamentGeometry(id, filament, props);
 }
 
 void Geometries::RemoveGeometry(GeometryId id) {
