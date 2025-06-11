@@ -376,6 +376,7 @@ drake_cc_library(
         ":proximity_utilities",
         "//common:overloaded",
         "//common:type_safe_index",
+        "//math:geometric_transform",
         "//math:vector3_util",
         "@fcl_internal//:fcl",
     ],

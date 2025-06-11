@@ -12,6 +12,8 @@
 #include "drake/common/type_safe_index.h"
 #include "drake/geometry/proximity/filament_self_contact_filter.h"
 #include "drake/geometry/proximity/proximity_utilities.h"
+#include "drake/math/rigid_transform.h"
+#include "drake/math/rotation_matrix.h"
 #include "drake/math/unit_vector.h"
 
 namespace drake {
@@ -21,6 +23,8 @@ namespace filament {
 
 using Eigen::Matrix3d;
 using Eigen::Vector3d;
+using math::RigidTransformd;
+using math::RotationMatrixd;
 
 namespace {
 
@@ -336,13 +340,10 @@ class Geometries::Impl {
       const Vector3d t = (node_ip1 - node_i) / l;
       const Vector3d& m1 = edge_m1.col(i);
       math::internal::ThrowIfNotOrthonormal(t, m1, __func__);
-      /* Rotation of the material frame. */
-      Matrix3d R_WM;
-      R_WM.col(0) = m1;
-      R_WM.col(1) = t.cross(m1);
-      R_WM.col(2) = t;
-      /* Position of the material frame origin expressed in world frame. */
-      const Vector3d p_WM = (node_i + node_ip1) / 2;
+      /* Pose of the material frame in the world frame. */
+      const RigidTransformd X_WM(
+          RotationMatrixd::MakeFromOrthonormalColumns(m1, t.cross(m1), t),
+          (node_i + node_ip1) / 2);
 
       std::unique_ptr<fcl::CollisionGeometryd> shape;
       const auto& cs = filament.cross_section();
@@ -354,8 +355,8 @@ class Geometries::Impl {
         shape = std::make_unique<fcl::Boxd>(rect_cs.width, rect_cs.height, l);
       }
 
-      filament_data.objects[i] =
-          std::make_unique<fcl::CollisionObjectd>(std::move(shape), R_WM, p_WM);
+      filament_data.objects[i] = std::make_unique<fcl::CollisionObjectd>(
+          std::move(shape), X_WM.GetAsIsometry3());
 
       FilamentEdgeData filament_edge_data(filament_index, i);
       filament_edge_data.write_to(filament_data.objects[i].get());
@@ -387,13 +388,10 @@ class Geometries::Impl {
       const Vector3d t = (node_ip1 - node_i) / l;
       const Vector3d m1 = q_WG.template segment<3>(num_nodes * 3 + 3 * i);
       math::internal::ThrowIfNotOrthonormal(t, m1, __func__);
-      /* Rotation of the material frame. */
-      Matrix3d R_WM;
-      R_WM.col(0) = m1;
-      R_WM.col(1) = t.cross(m1);
-      R_WM.col(2) = t;
-      /* Position of the material frame origin expressed in world frame. */
-      const Vector3d p_WM = (node_i + node_ip1) / 2;
+      /* Pose of the material frame in the world frame. */
+      const RigidTransformd X_WM(
+          RotationMatrixd::MakeFromOrthonormalColumns(m1, t.cross(m1), t),
+          (node_i + node_ip1) / 2);
 
       fcl::CollisionObjectd& object = *filament_data.objects[i];
       /* Casting away constness should be fine as long as we remember to call
@@ -414,7 +412,7 @@ class Geometries::Impl {
         DRAKE_UNREACHABLE();
       }
       shape->computeLocalAABB();
-      object.setTransform(R_WM, p_WM);
+      object.setTransform(X_WM.GetAsIsometry3());
       object.computeAABB();
     }
     filament_data.tree.update();
@@ -444,8 +442,8 @@ class Geometries::Impl {
     }
     for (auto iter = cbegin; iter != cend; ++iter) {
       GeometryId id_A = iter->first;
-      AddFilamentRigidContactGeometryPairs(id_A, collision_filter,
-                                           rigid_body_trees, &filament_contact);
+      AddFilamentRigidContactGeometryPairs(id_A, rigid_body_trees,
+                                           collision_filter, &filament_contact);
     }
     return filament_contact;
   }
@@ -516,9 +514,10 @@ class Geometries::Impl {
   }
 
   void AddFilamentRigidContactGeometryPairs(
-      GeometryId id_A, const CollisionFilter& collision_filter,
+      GeometryId id_A,
       const std::vector<const fcl::DynamicAABBTreeCollisionManagerd*>&
           rigid_body_trees,
+      const CollisionFilter& collision_filter,
       FilamentContact<double>* filament_contact) const {
     const FilamentData& filament_data = id_to_filament_data_.at(id_A);
     FilamentRigidCollisionCallbackData<double> callback_data(
