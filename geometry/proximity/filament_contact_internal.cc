@@ -1,8 +1,10 @@
 #include "drake/geometry/proximity/filament_contact_internal.h"
 
 #include <cstdint>
+#include <exception>
 #include <map>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -12,6 +14,7 @@
 #include "drake/common/type_safe_index.h"
 #include "drake/geometry/proximity/filament_self_contact_filter.h"
 #include "drake/geometry/proximity/proximity_utilities.h"
+#include "drake/geometry/proximity_properties.h"
 #include "drake/math/rigid_transform.h"
 #include "drake/math/rotation_matrix.h"
 #include "drake/math/unit_vector.h"
@@ -19,6 +22,7 @@
 namespace drake {
 namespace geometry {
 namespace internal {
+
 namespace filament {
 
 using Eigen::Matrix3d;
@@ -83,6 +87,62 @@ void FclCollide(const fcl::DynamicAABBTreeCollisionManager<T>& tree1,
   DRAKE_THROW_UNLESS(&tree1 != &tree2);
   tree1.collide(const_cast<fcl::DynamicAABBTreeCollisionManager<T>*>(&tree2),
                 cdata, callback);
+}
+
+/* A struct holding hydroelastic parameters.  */
+struct HydroelasticParams {
+  double hydroelastic_modulus;
+  double margin;
+  double resolution_hint;
+};
+/* Returns the hydroelastic parameters extracted if `props` has kHydroGroup. */
+std::optional<HydroelasticParams> ParseHydroelasticParams(
+    const ProximityProperties& props) {
+  if (!props.HasGroup(kHydroGroup)) return std::nullopt;
+
+  const HydroelasticType compliance_type = props.GetPropertyOrDefault(
+      kHydroGroup, kComplianceType, HydroelasticType::kCompliant);
+  if (compliance_type != HydroelasticType::kCompliant) {
+    throw std::invalid_argument(fmt::format(
+        "Filament only supports kCompliant for the ('{}','{}') property",
+        kHydroGroup, kComplianceType));
+  }
+
+  HydroelasticParams params;
+
+  std::string full_property_name =
+      fmt::format("('{}', '{}')", kHydroGroup, kElastic);
+  if (!props.HasProperty(kHydroGroup, kElastic)) {
+    throw std::invalid_argument(
+        fmt::format("Cannot create compliant filament; missing the {} property",
+                    full_property_name));
+  }
+  params.hydroelastic_modulus =
+      props.GetProperty<double>(kHydroGroup, kElastic);
+  if (params.hydroelastic_modulus <= 0) {
+    throw std::invalid_argument(
+        fmt::format("The {} property must be positive", full_property_name));
+  }
+
+  full_property_name = fmt::format("('{}', '{}')", kHydroGroup, kRezHint);
+  if (!props.HasProperty(kHydroGroup, kRezHint)) {
+    throw std::invalid_argument(
+        fmt::format("Cannot create compliant filament; missing the {} property",
+                    full_property_name));
+  }
+  params.resolution_hint = props.GetProperty<double>(kHydroGroup, kRezHint);
+  if (params.resolution_hint <= 0) {
+    throw std::invalid_argument(
+        fmt::format("The {} property must be positive", full_property_name));
+  }
+
+  full_property_name = fmt::format("('{}', '{}')", kHydroGroup, kMargin);
+  params.margin = props.GetPropertyOrDefault(kHydroGroup, kMargin, 0.0);
+  if (params.margin < 0) {
+    throw std::invalid_argument(fmt::format(
+        "The {} property must be non-negative", full_property_name));
+  }
+  return params;
 }
 
 /* Each filament is represented by a FilamentData struct, which contains the
@@ -315,13 +375,15 @@ class Geometries::Impl {
 
   void AddFilamentGeometry(GeometryId id, const Filament& filament,
                            const ProximityProperties& props) {
-    unused(props);
-
     DRAKE_THROW_UNLESS(!is_filament(id));
     const Eigen::Matrix3Xd& node_pos = filament.node_pos();
     const Eigen::Matrix3Xd& edge_m1 = filament.edge_m1();
     const int num_nodes = node_pos.cols();
     const int num_edges = edge_m1.cols();
+
+    std::optional<HydroelasticParams> hydroelastic_params =
+        ParseHydroelasticParams(props);
+    unused(hydroelastic_params);
 
     FilamentData& filament_data =
         id_to_filament_data_

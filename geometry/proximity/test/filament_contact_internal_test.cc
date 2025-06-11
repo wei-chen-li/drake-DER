@@ -204,6 +204,28 @@ GTEST_TEST(FilamentContactInternalTest, FilamentRigidContact) {
   EXPECT_NEAR(pair->signed_distances()[0], -d / 2, kTol);
 }
 
+GTEST_TEST(FilamentContactInternalTest, FilamentHydroelasticSelfContact) {
+  ProximityEngine<double> engine;
+
+  Eigen::Matrix3Xd node_positions(3, 4);
+  node_positions.col(0) = Vector3d(-0.1, 0, -1e-3);
+  node_positions.col(1) = Vector3d(+0.1, 0, -1e-3);
+  node_positions.col(2) = Vector3d(0, +0.1, +1e-3);
+  node_positions.col(3) = Vector3d(0, -0.1, +1e-3);
+
+  const bool closed = true;
+  const Filament::CircularCrossSection cross_section{.diameter = 1e-3};
+  Filament filament(closed, node_positions, cross_section);
+  GeometryId id = GeometryId::get_new_id();
+
+  ProximityProperties props;
+  props.AddProperty("hydroelastic", "margin", 1e-4);
+  props.AddProperty("hydroelastic", "hydroelastic_modulus", 1e5);
+  props.AddProperty("hydroelastic", "resolution_hint", 1e-3);
+
+  engine.AddFilamentGeometry(filament, id, props);
+}
+
 }  // namespace
 }  // namespace filament
 }  // namespace internal
