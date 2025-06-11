@@ -3,7 +3,11 @@
 #include <vector>
 
 #include "drake/common/overloaded.h"
+#include "drake/geometry/proximity/meshing_utilities.h"
+#include "drake/geometry/proximity/volume_to_surface_mesh.h"
 #include "drake/math/frame_transport.h"
+#include "drake/math/rigid_transform.h"
+#include "drake/math/rotation_matrix.h"
 
 namespace drake {
 namespace geometry {
@@ -11,108 +15,69 @@ namespace internal {
 
 namespace {
 
-template <typename T>
-void AddCrossSection(std::vector<SurfaceTriangle>* triangles,
-                     std::vector<Vector3<T>>* vertices_W,
-                     const Eigen::Matrix3X<T>& cs_vertices_C,
-                     const Eigen::Ref<const Vector3<T>>& pos,
-                     const Eigen::Ref<const Vector3<T>>& t,
-                     const Eigen::Ref<const Vector3<T>>& m1) {
-  DRAKE_DEMAND(triangles != nullptr);
-  DRAKE_DEMAND(vertices_W != nullptr);
-  const int num_segments = cs_vertices_C.cols();
-  DRAKE_DEMAND(ssize(*vertices_W) % num_segments == 0);
-  Matrix3<T> R_WC;
-  R_WC.col(0) = m1;
-  R_WC.col(1) = t.cross(m1);
-  R_WC.col(2) = t;
-  for (int i = 0; i < num_segments; ++i) {
-    vertices_W->emplace_back(R_WC * cs_vertices_C.col(i) + pos);
+std::vector<VolumeElement> SplitPolygonPrismToTetrahedra(
+    int center_vertex_index0, int center_vertex_index1,
+    int num_verts_per_cross_section) {
+  DRAKE_THROW_UNLESS((center_vertex_index1 - center_vertex_index0) %
+                         num_verts_per_cross_section ==
+                     0);
+  const int num_sides = num_verts_per_cross_section - 1;
+
+  std::vector<VolumeElement> elements;
+  for (int i = 0; i < num_sides; ++i) {
+    const int ip1 = (i + 1) % num_sides;
+    Append(SplitTriangularPrismToTetrahedra(
+               center_vertex_index0, center_vertex_index0 + 1 + i,
+               center_vertex_index0 + 1 + ip1, center_vertex_index1,
+               center_vertex_index1 + 1 + i, center_vertex_index1 + 1 + ip1),
+           &elements);
   }
-  const int offset2 = ssize(*vertices_W) - num_segments;
-  const int offset1 = offset2 - num_segments;
-  if (offset1 < 0) return;
-  for (int i = 0; i < num_segments; ++i) {
-    const int ip1 = (i + 1) % num_segments;
-    triangles->push_back(
-        SurfaceTriangle(offset1 + i, offset1 + ip1, offset2 + i));
-    triangles->push_back(
-        SurfaceTriangle(offset1 + ip1, offset2 + ip1, offset2 + i));
-  }
+  return elements;
 }
 
 template <typename T>
-void AddCaps(std::vector<SurfaceTriangle>* triangles,
-             std::vector<Vector3<T>>* vertices, int num_segments,
-             const Eigen::Ref<const Vector3<T>>& first_pos,
-             const Eigen::Ref<const Vector3<T>>& last_pos) {
-  DRAKE_DEMAND(triangles != nullptr);
-  DRAKE_DEMAND(vertices != nullptr);
-  DRAKE_DEMAND(ssize(*vertices) % num_segments == 0);
-  vertices->push_back(first_pos);
-  for (int i = 0; i < num_segments; ++i) {
-    const int ip1 = (i + 1) % num_segments;
-    triangles->push_back(SurfaceTriangle(ssize(*vertices) - 1, ip1, i));
-  }
-  vertices->push_back(last_pos);
-  const int offset = ssize(*vertices) - 2 - num_segments;
-  for (int i = 0; i < num_segments; ++i) {
-    const int ip1 = (i + 1) % num_segments;
-    triangles->push_back(
-        SurfaceTriangle(ssize(*vertices) - 1, offset + i, offset + ip1));
-  }
-}
-
-template <typename T>
-void ConnectEnds(std::vector<SurfaceTriangle>* triangles,
-                 const std::vector<Vector3<T>>& vertices, int num_segments) {
-  DRAKE_DEMAND(triangles != nullptr);
-  DRAKE_DEMAND(ssize(vertices) % num_segments == 0);
-  const int offset1 = ssize(vertices) - num_segments;
-  const int offset2 = 0;
-  for (int i = 0; i < num_segments; ++i) {
-    const int ip1 = (i + 1) % num_segments;
-    triangles->push_back(
-        SurfaceTriangle(offset1 + i, offset1 + ip1, offset2 + i));
-    triangles->push_back(
-        SurfaceTriangle(offset1 + ip1, offset2 + ip1, offset2 + i));
-  }
+void Append(const Eigen::Ref<const Eigen::Matrix3X<T>>& new_vertices,
+            std::vector<Vector3<T>>* mesh_vertices) {
+  DRAKE_THROW_UNLESS(mesh_vertices != nullptr);
+  for (int i = 0; i < new_vertices.cols(); ++i)
+    mesh_vertices->emplace_back(new_vertices.col(i));
 }
 
 }  // namespace
 
 template <typename T>
-TriangleSurfaceMesh<T> MakeFilamentSurfaceMesh(const Filament& filament) {
+VolumeMesh<T> MakeFilamentVolumeMesh(const Filament& filament) {
   DRAKE_THROW_UNLESS(filament.edge_m1().cols() ==
                      (filament.closed() ? filament.node_pos().cols()
                                         : filament.node_pos().cols() - 1));
 
-  /* Find the cross-section vertices in the cross-section frame.  */
-  const Eigen::Matrix3X<T> cs_vertices = std::visit(
+  /* Cross-section vertices in the cross-section frame. */
+  const Eigen::Matrix3X<T> p_CVs = std::visit(
       overloaded{
           [](const Filament::RectangularCrossSection& cs) {
-            Eigen::Matrix3X<T> vertices(3, 4);
+            Eigen::Matrix3X<T> vertices(3, 5);
             const T w = cs.width;
             const T h = cs.height;
             // clang-format off
-            vertices << -w / 2.0,  w / 2.0, w / 2.0, -w / 2.0,
-                        -h / 2.0, -h / 2.0, h / 2.0,  h / 2.0,
-                             0.0,      0.0,     0.0,      0.0;
+            vertices << 0.0, -w / 2.0,  w / 2.0, w / 2.0, -w / 2.0,
+                        0.0, -h / 2.0, -h / 2.0, h / 2.0,  h / 2.0,
+                        0.0,      0.0,      0.0,     0.0,      0.0;
             // clang-format on
             return vertices;
           },
           [](const Filament::CircularCrossSection& cs) {
-            const int kN =
-                20;  // TODO(wei-chen): Choose this number dynamically.
-            Eigen::Matrix3X<T> vertices(3, kN);
+            const int kN = 20;
+            Eigen::Matrix3X<T> vertices(3, kN + 1);
             auto theta =
                 VectorX<T>::LinSpaced(kN + 1, 0, 2 * M_PI).head(kN).array();
-            vertices.row(0) = 0.5 * cs.diameter * cos(theta);
-            vertices.row(1) = 0.5 * cs.diameter * sin(theta);
-            vertices.row(2) = VectorX<T>::Zero(kN);
+            vertices.col(0).setZero();
+            vertices.rightCols(kN).row(0) = 0.5 * cs.diameter * cos(theta);
+            vertices.rightCols(kN).row(1) = 0.5 * cs.diameter * sin(theta);
+            vertices.rightCols(kN).row(2) = VectorX<T>::Zero(kN);
             return vertices;
           }},
       filament.cross_section());
+  const int num_verts_per_cross_section = p_CVs.cols();
 
   /* Find the tangent and m1 vector of the edge frames. */
   std::vector<Vector3<T>> edge_t;
@@ -131,11 +96,11 @@ TriangleSurfaceMesh<T> MakeFilamentSurfaceMesh(const Filament& filament) {
     edge_m1.back().normalize();
     if (ip1 != 0) node_pos.emplace_back(filament.node_pos().col(ip1).cast<T>());
   }
-  DRAKE_ASSERT(ssize(edge_t) == ssize(edge_m1));
-  DRAKE_ASSERT(ssize(edge_t) ==
+  DRAKE_DEMAND(ssize(edge_t) == ssize(edge_m1));
+  DRAKE_DEMAND(ssize(edge_t) ==
                (filament.closed() ? ssize(node_pos) : ssize(node_pos) - 1));
 
-  std::vector<SurfaceTriangle> triangles;
+  std::vector<VolumeElement> elements;
   std::vector<Vector3<T>> vertices;
   for (int i = 0; i < ssize(node_pos); ++i) {
     Vector3<T> t, m1;
@@ -150,19 +115,33 @@ TriangleSurfaceMesh<T> MakeFilamentSurfaceMesh(const Filament& filament) {
       math::FrameTransport<T>(edge_t[i], edge_m1[i], t, m1b);
       m1 = (m1a + m1b) / 2;
     }
-    AddCrossSection<T>(&triangles, &vertices, cs_vertices, node_pos[i], t, m1);
+    /* Pose of cross-section frame in world frame. */
+    const math::RigidTransform<T> X_WC(
+        math::RotationMatrix<T>::MakeFromOrthonormalColumns(m1, t.cross(m1), t),
+        node_pos[i]);
+
+    Append<double>(X_WC * p_CVs, &vertices);
+    if (i == 0) continue;
+    Append(SplitPolygonPrismToTetrahedra(num_verts_per_cross_section * (i - 1),
+                                         num_verts_per_cross_section * i,
+                                         num_verts_per_cross_section),
+           &elements);
+    if (filament.closed() && i == ssize(node_pos) - 1) {
+      Append(SplitPolygonPrismToTetrahedra(num_verts_per_cross_section * i, 0,
+                                           num_verts_per_cross_section),
+             &elements);
+    }
   }
-  if (!filament.closed()) {
-    AddCaps<T>(&triangles, &vertices, cs_vertices.cols(), node_pos.front(),
-               node_pos.back());
-  } else {
-    ConnectEnds<T>(&triangles, vertices, cs_vertices.cols());
-  }
-  return TriangleSurfaceMesh<T>(std::move(triangles), std::move(vertices));
+  return VolumeMesh<T>(std::move(elements), std::move(vertices));
 }
 
-template TriangleSurfaceMesh<double> MakeFilamentSurfaceMesh<double>(
-    const Filament&);
+template <typename T>
+TriangleSurfaceMesh<T> MakeFilamentSurfaceMesh(const Filament& filament) {
+  return ConvertVolumeToSurfaceMesh<T>(MakeFilamentVolumeMesh<T>(filament));
+}
+
+template VolumeMesh<double> MakeFilamentVolumeMesh(const Filament&);
+template TriangleSurfaceMesh<double> MakeFilamentSurfaceMesh(const Filament&);
 
 }  // namespace internal
 }  // namespace geometry

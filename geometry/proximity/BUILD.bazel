@@ -688,10 +688,14 @@ drake_cc_library(
     srcs = ["make_filament_mesh.cc"],
     hdrs = ["make_filament_mesh.h"],
     deps = [
+        ":meshing_utilities",
         ":triangle_surface_mesh",
+        ":volume_mesh",
+        ":volume_to_surface_mesh",
         "//common:overloaded",
         "//geometry:shape_specification",
         "//math:frame_transport",
+        "//math:geometric_transform",
     ],
 )
 
@@ -1541,6 +1545,14 @@ drake_cc_googletest(
     name = "make_ellipsoid_mesh_test",
     deps = [
         ":make_ellipsoid_mesh",
+    ],
+)
+
+drake_cc_googletest(
+    name = "make_filament_mesh_test",
+    deps = [
+        ":make_filament_mesh",
+        ":proximity_utilities",
     ],
 )
 
