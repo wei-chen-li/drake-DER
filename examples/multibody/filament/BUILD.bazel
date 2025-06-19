@@ -94,8 +94,7 @@ drake_cc_binary(
         ":knot_configurations",
     ],
     test_rule_args = [
-        "-simulation_time=0.1",
-        "-realtime_rate=0.0",
+        "-simulation_time=0.001",
     ],
     deps = [
         "//geometry:drake_visualizer",
