@@ -25,7 +25,7 @@ class FilamentSoftGeometrySegment {
       const std::variant<Filament::CircularCrossSection,
                          Filament::RectangularCrossSection>& cross_section,
       double segment_length, double hydroelastic_margin, double resolution_hint,
-      double hydroelastic_pressure);
+      double hydroelastic_modulus);
 
   hydroelastic::SoftGeometry MakeSoftGeometry(
       const Eigen::Ref<const Eigen::Vector3d>& node_0,
@@ -54,7 +54,7 @@ class FilamentSoftGeometry {
  public:
   DRAKE_DEFAULT_COPY_AND_MOVE_AND_ASSIGN(FilamentSoftGeometry)
 
-  FilamentSoftGeometry(const Filament& filament, double hydroelastic_pressure,
+  FilamentSoftGeometry(const Filament& filament, double hydroelastic_modulus,
                        double resolution_hint, double hydroelastic_margin = 0);
 
   /* Updates the node positions and edge m1 directors of the filament geometry.

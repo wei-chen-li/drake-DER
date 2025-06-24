@@ -69,13 +69,13 @@ MakeFilamentSegmentMesh(const Filament::CircularCrossSection& cross_section,
 /* Makes the hydroelastic pressure for the mesh vertices. */
 std::vector<double> MakeFilamentSegmentPressureField(
     const Filament::CircularCrossSection& cross_section,
-    double hydroelastic_margin, double hydroelastic_pressure,
+    double hydroelastic_margin, double hydroelastic_modulus,
     const Eigen::Matrix3Xd& p_CVs, int num_cross_sections) {
   std::vector<double> pressures;
   pressures.reserve(p_CVs.cols() * num_cross_sections);
-  const double pressure_max = hydroelastic_pressure;
+  const double pressure_max = hydroelastic_modulus;
   const double pressure_min =
-      -hydroelastic_pressure / cross_section.diameter * hydroelastic_margin;
+      -hydroelastic_modulus / cross_section.diameter * hydroelastic_margin;
   for (int k = 0; k < num_cross_sections; ++k) {
     pressures.push_back(pressure_max);
     for (int i = 1; i < p_CVs.cols(); ++i) {
@@ -99,9 +99,9 @@ MakeFilamentSegmentMesh(const Filament::RectangularCrossSection& cross_section,
 
 std::vector<double> MakeFilamentSegmentPressureField(
     const Filament::RectangularCrossSection& cross_section,
-    double hydroelastic_margin, double hydroelastic_pressure,
+    double hydroelastic_margin, double hydroelastic_modulus,
     const Eigen::Matrix3Xd& p_CVs, int num_cross_sections) {
-  unused(cross_section, hydroelastic_margin, hydroelastic_pressure, p_CVs,
+  unused(cross_section, hydroelastic_margin, hydroelastic_modulus, p_CVs,
          num_cross_sections);
   throw std::logic_error(
       "MakeFilamentSegmentPressureField() not implemented for "
@@ -145,14 +145,14 @@ FilamentSoftGeometrySegment::FilamentSoftGeometrySegment(
     const std::variant<Filament::CircularCrossSection,
                        Filament::RectangularCrossSection>& cross_section,
     double segment_length, double hydroelastic_margin, double resolution_hint,
-    double hydroelastic_pressure) {
+    double hydroelastic_modulus) {
   std::visit(
       [&](auto&& cs) {
         std::tie(p_CVs_, num_cross_sections_, elements_) =
             MakeFilamentSegmentMesh(cs, segment_length, hydroelastic_margin,
                                     resolution_hint);
         pressures_ = MakeFilamentSegmentPressureField(
-            cs, hydroelastic_margin, hydroelastic_pressure, p_CVs_,
+            cs, hydroelastic_margin, hydroelastic_modulus, p_CVs_,
             num_cross_sections_);
       },
       cross_section);
@@ -202,7 +202,7 @@ std::unique_ptr<VolumeMesh<double>> FilamentSoftGeometrySegment::MakeVolumeMesh(
 }
 
 FilamentSoftGeometry::FilamentSoftGeometry(const Filament& filament,
-                                           double hydroelastic_pressure,
+                                           double hydroelastic_modulus,
                                            double resolution_hint,
                                            double hydroelastic_margin)
     : closed_(filament.closed()),
@@ -218,7 +218,7 @@ FilamentSoftGeometry::FilamentSoftGeometry(const Filament& filament,
   }
   segment_ = FilamentSoftGeometrySegment(
       filament.cross_section(), length / num_edges_, hydroelastic_margin,
-      resolution_hint, hydroelastic_pressure);
+      resolution_hint, hydroelastic_modulus);
 }
 
 void FilamentSoftGeometry::UpdateConfigurationVector(

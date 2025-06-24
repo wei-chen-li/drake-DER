@@ -375,6 +375,7 @@ drake_cc_library(
     ],
     implementation_deps = [
         ":filament_self_contact_filter",
+        ":filament_soft_geometry",
         ":proximity_utilities",
         "//common:overloaded",
         "//common:type_safe_index",

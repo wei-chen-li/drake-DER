@@ -13,6 +13,7 @@
 #include "drake/common/overloaded.h"
 #include "drake/common/type_safe_index.h"
 #include "drake/geometry/proximity/filament_self_contact_filter.h"
+#include "drake/geometry/proximity/filament_soft_geometry.h"
 #include "drake/geometry/proximity/proximity_utilities.h"
 #include "drake/geometry/proximity_properties.h"
 #include "drake/math/rigid_transform.h"
@@ -163,10 +164,11 @@ struct FilamentData {
   const int num_nodes{};
   const int num_edges{};
   Eigen::Matrix3Xd node_positions;
-  std::optional<FilamentSelfContactFilter> self_contact_filter;
   fcl::DynamicAABBTreeCollisionManagerd tree;
   std::vector<std::unique_ptr<fcl::CollisionObjectd>> objects;
   std::unordered_set<const fcl::CollisionObjectd*> object_pointers;
+  std::optional<FilamentSelfContactFilter> self_contact_filter;
+  std::optional<FilamentSoftGeometry> soft_geometry;
 };
 
 /* Each added filament to Geometries is indexed by a FilamentIndex. */
@@ -381,10 +383,6 @@ class Geometries::Impl {
     const int num_nodes = node_pos.cols();
     const int num_edges = edge_m1.cols();
 
-    std::optional<HydroelasticParams> hydroelastic_params =
-        ParseHydroelasticParams(props);
-    unused(hydroelastic_params);
-
     FilamentData& filament_data =
         id_to_filament_data_
             .emplace(id, FilamentData(filament.closed(), num_nodes, num_edges))
@@ -441,6 +439,14 @@ class Geometries::Impl {
                                 return std::hypot(cs.width, cs.height);
                               }},
                    filament.cross_section()));
+
+    std::optional<HydroelasticParams> hydroelastic_params =
+        ParseHydroelasticParams(props);
+    if (hydroelastic_params) {
+      filament_data.soft_geometry = FilamentSoftGeometry(
+          filament, hydroelastic_params->hydroelastic_modulus,
+          hydroelastic_params->resolution_hint, hydroelastic_params->margin);
+    }
   }
 
   void RemoveGeometry(GeometryId id) { id_to_filament_data_.erase(id); }
@@ -455,6 +461,9 @@ class Geometries::Impl {
     DRAKE_DEMAND(q_WG.size() == num_nodes * 3 + num_edges * 3);
     filament_data.node_positions =
         Eigen::Map<const Eigen::Matrix3Xd>(q_WG.data(), 3, num_nodes);
+    if (filament_data.soft_geometry) {
+      filament_data.soft_geometry->UpdateConfigurationVector(q_WG);
+    }
 
     for (int i = 0; i < num_edges; ++i) {
       const int ip1 = (i + 1) % num_nodes;
@@ -554,6 +563,7 @@ class Geometries::Impl {
       filament_data_clone.tree.setup();
       filament_data_clone.self_contact_filter =
           filament_data_source.self_contact_filter;
+      filament_data_clone.soft_geometry = filament_data_source.soft_geometry;
     }
     clone->filament_index_to_id_ = this->filament_index_to_id_;
     return clone;
