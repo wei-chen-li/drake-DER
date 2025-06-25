@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <optional>
 #include <tuple>
 #include <unordered_map>
@@ -10,6 +11,7 @@
 #include "drake/common/eigen_types.h"
 #include "drake/common/ssize.h"
 #include "drake/geometry/geometry_ids.h"
+#include "drake/geometry/query_results/contact_surface.h"
 #include "drake/math/rotation_matrix.h"
 
 namespace drake {
@@ -53,17 +55,28 @@ class FilamentContactGeometryPair {
       Tuples (𝑤₀, w₁, 𝑤₂) so that the velocity of a point Bc coincident with
       the contact point C and affixed to geometry B, denoted as v_WBc, equals
       𝑤₀ ẋᵢ + w₁ γ̇ⁱ + 𝑤₂ ẋᵢ₊₁.
-   @pre `id_A < id_B`.
+   @params[in] areas
+      (Optional) Areas of the contact patches.
+   @params[in] pressures
+      (Optional) Pressure at the centroid of the contact patches.
+   @params[in] surface_meshes
+      (Optional) Surface meshes containing the contact patches.
+   @pre `id_A <= id_B`.
    @pre `p_WCs`, `nhats_BA_W`, `signed_distances`, `contact_edge_indexes_A`,
       `kinematic_weights_A`, `contact_edge_indexes_B`, and
-      `kinematic_weights_B` have the same size and not empty. */
+      `kinematic_weights_B` have the same size and not empty.
+   @pre `areas` and `pressures` have the same size as `p_WCs` if non-null. */
   FilamentContactGeometryPair(
       GeometryId id_A, GeometryId id_B, std::vector<Vector3<T>> p_WCs,
       std::vector<Vector3<T>> nhats_BA_W, std::vector<T> signed_distances,
       std::vector<int> contact_edge_indexes_A,
       std::vector<std::tuple<T, Vector3<T>, T>> kinematic_weights_A,
       std::vector<int> contact_edge_indexes_B,
-      std::vector<std::tuple<T, Vector3<T>, T>> kinematic_weights_B);
+      std::vector<std::tuple<T, Vector3<T>, T>> kinematic_weights_B,
+      std::optional<std::vector<T>> areas = std::nullopt,
+      std::optional<std::vector<T>> pressures = std::nullopt,
+      std::optional<std::vector<PolygonSurfaceMesh<T>>> surface_meshes =
+          std::nullopt);
 
   /* Constructs a filament-rigid contact geometry pair with the given data.
    @param[in] id_A
@@ -84,13 +97,24 @@ class FilamentContactGeometryPair {
       Tuples (𝑤₀, w₁, 𝑤₂) so that the velocity of a point Ac coincident with
       the contact point C and affixed to geometry A, denoted as v_WAc, equals
       𝑤₀ ẋᵢ + w₁ γ̇ⁱ + 𝑤₂ ẋᵢ₊₁.
+   @params[in] areas
+      (Optional) Areas of the contact patches.
+   @params[in] pressures
+      (Optional) Pressure at the centroid of the contact patches.
+   @params[in] surface_meshes
+      (Optional) Surface meshes containing the contact patches.
    @pre `p_WCs`, `nhats_BA_W`, `signed_distances`, `contact_edge_indexes_A`, and
-      `kinematic_weights_A` have the same size and not empty. */
+      `kinematic_weights_A` have the same size and not empty.
+   @pre `areas` and `pressures` have the same size as `p_WCs` if non-null. */
   FilamentContactGeometryPair(
       GeometryId id_A, GeometryId id_B, std::vector<Vector3<T>> p_WCs,
       std::vector<Vector3<T>> nhats_BA_W, std::vector<T> signed_distances,
       std::vector<int> contact_edge_indexes_A,
-      std::vector<std::tuple<T, Vector3<T>, T>> kinematic_weights_A);
+      std::vector<std::tuple<T, Vector3<T>, T>> kinematic_weights_A,
+      std::optional<std::vector<T>> areas = std::nullopt,
+      std::optional<std::vector<T>> pressures = std::nullopt,
+      std::optional<std::vector<PolygonSurfaceMesh<T>>> surface_meshes =
+          std::nullopt);
 
   /* Returns the GeometryId of geometry A. If `is_B_filament()` is true, this
    is guaranteed to be less than or equal to id_B(). */
@@ -102,6 +126,9 @@ class FilamentContactGeometryPair {
 
   /* Returns true if geometry B is a filament, false if geometry B is rigid. */
   bool is_B_filament() const { return contact_edge_indexes_B_.has_value(); }
+
+  /* Returns true if the contacts contains patch information. */
+  bool is_patch_contact() const { return areas_.has_value(); }
 
   /* Returns the total number of contact points between this geometry pair. */
   int num_contact_points() const { return ssize(p_WCs_); }
@@ -125,6 +152,22 @@ class FilamentContactGeometryPair {
    p_WCs() or nhats_BA_W(). */
   const std::vector<T>& signed_distances() const { return signed_distances_; }
 
+  /* Returns the areas of the contact patches. The ordering is same as p_WCs()
+   or nhats_BA_W().
+   @pre `is_patch_contact()`. */
+  const std::vector<T>& areas() const {
+    DRAKE_THROW_UNLESS(is_patch_contact());
+    return *areas_;
+  }
+
+  /* Returns the pressure at the centroid of the contact patches. The ordering
+   is same as p_WCs() or nhats_BA_W().
+   @pre `is_patch_contact()`. */
+  const std::vector<T>& pressures() const {
+    DRAKE_THROW_UNLESS(is_patch_contact());
+    return *pressures_;
+  }
+
   /* Returns the indexes of filament A edges participating in contact. The
    ordering is same as p_WCs() or nhats_BA_W(). */
   const std::vector<int>& contact_edge_indexes_A() const {
@@ -147,12 +190,19 @@ class FilamentContactGeometryPair {
   }
 
   /* Returns tuples (𝑤₀, w₁, 𝑤₂) so that the velocity of a point Bc coincident
-    with the contact point C and affixed to geometry B, denoted as v_WBc, equals
-    𝑤₀ ẋᵢ + w₁ γ̇ⁱ + 𝑤₂ ẋᵢ₊₁.
-    @pre `is_B_filament()`. */
+   with the contact point C and affixed to geometry B, denoted as v_WBc, equals
+   𝑤₀ ẋᵢ + w₁ γ̇ⁱ + 𝑤₂ ẋᵢ₊₁.
+   @pre `is_B_filament()`. */
   const std::vector<std::tuple<T, Vector3<T>, T>>& kinematic_weights_B() const {
     DRAKE_THROW_UNLESS(is_B_filament());
     return *kinematic_weights_B_;
+  }
+
+  /* Returns the surface meshes containing the contact patches.
+   @pre `is_patch_contact()`. */
+  const std::vector<PolygonSurfaceMesh<T>>& surface_meshes() const {
+    DRAKE_THROW_UNLESS(is_patch_contact());
+    return *surface_meshes_;
   }
 
  private:
@@ -166,6 +216,11 @@ class FilamentContactGeometryPair {
   std::vector<std::tuple<T, Vector3<T>, T>> kinematic_weights_A_;
   std::optional<std::vector<int>> contact_edge_indexes_B_;
   std::optional<std::vector<std::tuple<T, Vector3<T>, T>>> kinematic_weights_B_;
+  std::optional<std::vector<T>> areas_;
+  std::optional<std::vector<T>> pressures_;
+  std::optional<std::vector<Vector3<T>>> pressure_gradients_A_W_;
+  std::optional<std::vector<Vector3<T>>> pressure_gradients_B_W_;
+  std::optional<std::vector<PolygonSurfaceMesh<T>>> surface_meshes_;
 };
 
 /* Data structure to hold contact information about filaments.
@@ -177,7 +232,8 @@ class FilamentContact {
 
   FilamentContact() = default;
 
-  /* Adds a filament-filament contact geometry pair to this FilamentContact.
+  /* Adds a filament-filament point contact geometry pair to this
+   FilamentContact.
    @param[in] id_A
       The GeometryId of the filament geometry A.
    @param[in] id_B
@@ -190,16 +246,16 @@ class FilamentContact {
    @param[in] signed_distances
       The signed distances of the contacts.
    @param[in] contact_edge_indexes_A
-      The indexes of filament A edges under contact for each contact point.
+      The indexes of filament A edges for each contact point.
    @param[in] contact_edge_indexes_B
-      The indexes of filament B edges under contact for each contact point.
+      The indexes of filament B edges for each contact point.
    @param[in] node_positions_A
-      The position of the nodes of filament A. This is used to compute the
+      The position of the nodes of filament A. This is required to compute the
       kinematic coordinates.
    @param[in] node_positions_B
-      The position of the nodes of filament B. This is used to compute the
+      The position of the nodes of filament B. This is required to compute the
       kinematic coordinates.
-   @pre `id_A < id_B`.
+   @pre `id_A <= id_B`.
    @pre `p_WCs`, `nhats_BA_W`, `signed_distances`, `contact_edge_indexes_A`, and
       `contact_edge_indexes_B` have the same size and not empty. */
   void AddFilamentFilamentContactGeometryPair(
@@ -210,7 +266,7 @@ class FilamentContact {
       const Eigen::Ref<const Eigen::Matrix3X<T>>& node_positions_A,
       const Eigen::Ref<const Eigen::Matrix3X<T>>& node_positions_B);
 
-  /* Adds a filament-rigid contact geometry pair to this FilamentContact.
+  /* Adds a filament-rigid point contact geometry pair to this FilamentContact.
    @param[in] id_A
       The GeometryId of the filament geometry A.
    @param[in] id_B
@@ -223,9 +279,9 @@ class FilamentContact {
    @param[in] signed_distances
       The signed distances of the contacts.
    @param[in] contact_edge_indexes_A
-      The indexes of filament A edges under contact for each contact point.
+      The indexes of filament A edges for each contact point.
    @param[in] node_positions_A
-      The position of the nodes of filament A. This is used to compute the
+      The position of the nodes of filament A. This is required to compute the
       kinematic coordinates.
    @pre `p_WCs`, `nhats_BA_W`, `signed_distances`, and `contact_edge_indexes_A`
       have the same size and not empty. */
@@ -233,6 +289,64 @@ class FilamentContact {
       GeometryId id_A, GeometryId id_B, std::vector<Vector3<T>> p_WCs,
       std::vector<Vector3<T>> nhats_BA_W, std::vector<T> signed_distances,
       std::vector<int> contact_edge_indexes_A,
+      const Eigen::Ref<const Eigen::Matrix3X<T>>& node_positions_A);
+
+  /* Adds a filament-filament patch contact geometry pair to this
+   FilamentContact.
+   @param[in] id_A
+      The GeometryId of the filament geometry A.
+   @param[in] id_B
+      The GeometryId of the filament geometry B.
+   @param[in] contact_surfaces
+      The contact surfaces between the two geometries.
+   @param[in] contact_edge_indexes_A_per_surface
+      The indexes of filament A edges for each contact surface.
+   @param[in] contact_edge_indexes_B_per_surface
+      The indexes of filament B edges for each contact surface.
+   @param[in] node_positions_A
+      The position of the nodes of filament A. This is required to compute the
+      kinematic coordinates.
+   @param[in] node_positions_B
+      The position of the nodes of filament B. This is required to compute the
+      kinematic coordinates.
+   @pre `id_A <= id_B`.
+   @pre For all `contact_surface` in `contact_surfaces`:
+      `contact_surface != nullptr &&
+      ((contact_surface->id_M() == id_A && contact_surface->id_N() == id_B) ||
+       (contact_surface->id_M() == id_B && contact_surface->id_N() == id_A)) &&
+       contact_surface->HasGradE_M() && contact_surface->HasGradE_N() &&
+       contact_surface.representation() == kPolygon`. */
+  void AddFilamentFilamentContactGeometryPair(
+      GeometryId id_A, GeometryId id_B,
+      const std::vector<std::unique_ptr<ContactSurface<T>>>& contact_surfaces,
+      const std::vector<int>& contact_edge_indexes_A_per_surface,
+      const std::vector<int>& contact_edge_indexes_B_per_surface,
+      const Eigen::Ref<const Eigen::Matrix3X<T>>& node_positions_A,
+      const Eigen::Ref<const Eigen::Matrix3X<T>>& node_positions_B);
+
+  /* Adds a filament-rigid patch contact geometry pair to this FilamentContact.
+   @param[in] id_A
+      The GeometryId of the filament geometry A.
+   @param[in] id_B
+      The GeometryId of the filament geometry B.
+   @param[in] contact_surfaces
+      The contact surfaces between the two geometries.
+   @param[in] contact_edge_indexes_A_per_surface
+      The indexes of filament A edges for each contact surface.
+   @param[in] node_positions_A
+      The position of the nodes of filament A. This is required to compute the
+      kinematic coordinates.
+   @pre For all `contact_surface` in `contact_surfaces`:
+      `contact_surface != nullptr &&
+      ((contact_surface->id_M() == id_A && contact_surface->id_N() == id_B &&
+        contact_surface->HasGradE_M()) ||
+       (contact_surface->id_M() == id_B && contact_surface->id_N() == id_A &&
+        contact_surface->HasGradE_N())) &&
+       contact_surface.representation() == kPolygon`. */
+  void AddFilamentRigidContactGeometryPair(
+      GeometryId id_A, GeometryId id_B,
+      const std::vector<std::unique_ptr<ContactSurface<T>>>& contact_surfaces,
+      const std::vector<int>& contact_edge_indexes_A_per_surface,
       const Eigen::Ref<const Eigen::Matrix3X<T>>& node_positions_A);
 
   /* Returns a list of geometry pairs that are in contact, where at least one of

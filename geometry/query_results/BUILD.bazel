@@ -83,6 +83,7 @@ drake_cc_library(
     srcs = ["filament_contact.cc"],
     hdrs = ["filament_contact.h"],
     deps = [
+        ":contact_surface",
         "//common:essential",
         "//geometry:geometry_ids",
         "//math:geometric_transform",
@@ -103,6 +104,8 @@ drake_cc_googletest(
     deps = [
         ":filament_contact",
         "//common/test_utilities:eigen_matrix_compare",
+        "//geometry:proximity_engine",
+        "//geometry:proximity_properties",
     ],
 )
 
