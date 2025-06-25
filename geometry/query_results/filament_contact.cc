@@ -60,8 +60,8 @@ FilamentContactGeometryPair<T>::FilamentContactGeometryPair(
   DRAKE_THROW_UNLESS(p_WCs_.size() == kinematic_weights_B_->size());
   DRAKE_THROW_UNLESS(!p_WCs_.empty());
 
-  R_WCs_.reserve(num_contacts());
-  for (int i = 0; i < num_contacts(); ++i) {
+  R_WCs_.reserve(num_contact_points());
+  for (int i = 0; i < num_contact_points(); ++i) {
     constexpr int kZAxis = 2;
     R_WCs_.emplace_back(math::RotationMatrix<T>::MakeFromOneUnitVector(
         -nhats_BA_W_[i], kZAxis));
@@ -87,8 +87,8 @@ FilamentContactGeometryPair<T>::FilamentContactGeometryPair(
   DRAKE_THROW_UNLESS(p_WCs_.size() == kinematic_weights_A_.size());
   DRAKE_THROW_UNLESS(!p_WCs_.empty());
 
-  R_WCs_.reserve(num_contacts());
-  for (int i = 0; i < num_contacts(); ++i) {
+  R_WCs_.reserve(num_contact_points());
+  for (int i = 0; i < num_contact_points(); ++i) {
     constexpr int kZAxis = 2;
     R_WCs_.emplace_back(math::RotationMatrix<T>::MakeFromOneUnitVector(
         -nhats_BA_W_[i], kZAxis));

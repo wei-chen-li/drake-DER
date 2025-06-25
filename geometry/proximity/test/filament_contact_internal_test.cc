@@ -57,7 +57,7 @@ GTEST_TEST(FilamentContactInternalTest, FilamentSelfContact) {
       filament_contact.contact_geometry_pairs()[0];
   EXPECT_EQ(pair.id_A(), id);
   EXPECT_EQ(pair.id_B(), id);
-  ASSERT_EQ(pair.num_contacts(), 1);
+  ASSERT_EQ(pair.num_contact_points(), 1);
   EXPECT_EQ(pair.contact_edge_indexes_A()[0], 0);
   EXPECT_EQ(pair.contact_edge_indexes_B()[0], 2);
   constexpr double kTol = 1e-10;
@@ -121,7 +121,7 @@ GTEST_TEST(FilamentContactInternalTest, FilamentFilamentContact) {
       filament_contact.contact_geometry_pairs()[0];
   EXPECT_EQ(pair.id_A(), id_A);
   EXPECT_EQ(pair.id_B(), id_B);
-  ASSERT_EQ(pair.num_contacts(), 1);
+  ASSERT_EQ(pair.num_contact_points(), 1);
   EXPECT_EQ(pair.contact_edge_indexes_A()[0], 1);
   EXPECT_EQ(pair.contact_edge_indexes_B()[0], 0);
   constexpr double kTol = 1e-10;
@@ -175,7 +175,7 @@ GTEST_TEST(FilamentContactInternalTest, FilamentRigidContact) {
       &filament_contact.contact_geometry_pairs()[0];
   EXPECT_EQ(pair->id_A(), id_A);
   EXPECT_EQ(pair->id_B(), id_G1);
-  ASSERT_EQ(pair->num_contacts(), 1);
+  ASSERT_EQ(pair->num_contact_points(), 1);
   EXPECT_EQ(pair->contact_edge_indexes_A()[0], 0);
   constexpr double kTol = 1e-10;
   EXPECT_TRUE(
@@ -197,7 +197,7 @@ GTEST_TEST(FilamentContactInternalTest, FilamentRigidContact) {
   pair = &filament_contact.contact_geometry_pairs()[0];
   EXPECT_EQ(pair->id_A(), id_A);
   EXPECT_EQ(pair->id_B(), id_G2);
-  ASSERT_EQ(pair->num_contacts(), 1);
+  ASSERT_EQ(pair->num_contact_points(), 1);
   EXPECT_EQ(pair->contact_edge_indexes_A()[0], 1);
   EXPECT_TRUE(CompareMatrices(pair->p_WCs()[0], Vector3d(0.6, 0, d / 4), kTol));
   EXPECT_TRUE(CompareMatrices(pair->nhats_BA_W()[0], Vector3d(0, 0, -1), kTol));

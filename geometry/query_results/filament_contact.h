@@ -103,8 +103,8 @@ class FilamentContactGeometryPair {
   /* Returns true if geometry B is a filament, false if geometry B is rigid. */
   bool is_B_filament() const { return contact_edge_indexes_B_.has_value(); }
 
-  /* Returns the total number of contacts between this geometry pair. */
-  int num_contacts() const { return ssize(p_WCs_); }
+  /* Returns the total number of contact points between this geometry pair. */
+  int num_contact_points() const { return ssize(p_WCs_); }
 
   /* Returns the contact points expressed in the world frame. */
   const std::vector<Vector3<T>>& p_WCs() const { return p_WCs_; }

@@ -520,16 +520,16 @@ DeformableDriver<T>::ComputeContactDataForFilament(
   result.p_WG = std::accumulate(geometry_pair.p_WCs().begin(),
                                 geometry_pair.p_WCs().end(),
                                 Vector3<T>(Vector3<T>::Zero())) /
-                geometry_pair.num_contacts();
+                geometry_pair.num_contact_points();
   result.name = fmt::format("deformable id {}", geometry_id);
-  result.v_WGc.reserve(geometry_pair.num_contacts());
-  result.jacobian.reserve(geometry_pair.num_contacts());
+  result.v_WGc.reserve(geometry_pair.num_contact_points());
+  result.jacobian.reserve(geometry_pair.num_contact_points());
 
   /* The Jacobian block triplets to be filled in. There are at most 7 nonzero
    blocks. */
   std::vector<typename Block3x1SparseMatrix<T>::Triplet> triplets;
   triplets.reserve(7);
-  for (int k = 0; k < geometry_pair.num_contacts(); ++k) {
+  for (int k = 0; k < geometry_pair.num_contact_points(); ++k) {
     /* The contact Jacobian (w.r.t. v) of the velocity of the point affixed to
      the geometry that coincides with the contact point C in the world frame,
      expressed in the contact frame C. We scale it by -1 if the body corresponds
@@ -625,7 +625,7 @@ DeformableDriver<T>::ComputeContactDataForRigid(
   const Frame<T>& frame_W = manager_->plant().world_frame();
   const int nv = manager_->plant().num_velocities();
   Matrix3X<T> Jv_v_WGc_W(3, nv);
-  for (int k = 0; k < geometry_pair.num_contacts(); ++k) {
+  for (int k = 0; k < geometry_pair.num_contact_points(); ++k) {
     const Vector3<T>& p_WC = geometry_pair.p_WCs()[k];
     manager_->internal_tree().CalcJacobianTranslationalVelocity(
         context, JacobianWrtVariable::kV, rigid_body.body_frame(), frame_W,
@@ -922,7 +922,7 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
      and clear the vector repeatedly in the loop over the contact points. */
     std::vector<typename DiscreteContactPair<T>::JacobianTreeBlock>
         jacobian_blocks;
-    for (int i = 0; i < geometry_pair.num_contacts(); ++i) {
+    for (int i = 0; i < geometry_pair.num_contact_points(); ++i) {
       jacobian_blocks.clear();
       const Vector3<T>& v_WAc = contact_data_A.v_WGc[i];
       jacobian_blocks.push_back(std::move(contact_data_A.jacobian[i]));
