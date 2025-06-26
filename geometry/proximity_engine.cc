@@ -909,7 +909,8 @@ class ProximityEngine<T>::Impl : public ShapeReifier {
   void ComputeFilamentContact(FilamentContact<double>* filament_contact) const {
     DRAKE_THROW_UNLESS(filament_contact != nullptr);
     *filament_contact = filament_geometries_.ComputeFilamentContact(
-        collision_filter_, {&dynamic_tree_, &anchored_tree_});
+        collision_filter_, {&dynamic_tree_, &anchored_tree_},
+        &hydroelastic_geometries_);
   }
 
   // Testing utilities

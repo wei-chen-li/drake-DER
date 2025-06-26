@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <exception>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -14,6 +15,8 @@
 #include "drake/common/type_safe_index.h"
 #include "drake/geometry/proximity/filament_self_contact_filter.h"
 #include "drake/geometry/proximity/filament_soft_geometry.h"
+#include "drake/geometry/proximity/hydroelastic_calculator.h"
+#include "drake/geometry/proximity/hydroelastic_internal.h"
 #include "drake/geometry/proximity/proximity_utilities.h"
 #include "drake/geometry/proximity_properties.h"
 #include "drake/math/rigid_transform.h"
@@ -164,6 +167,7 @@ struct FilamentData {
   const int num_nodes{};
   const int num_edges{};
   Eigen::Matrix3Xd node_positions;
+  Eigen::Vector3d margins;
   fcl::DynamicAABBTreeCollisionManagerd tree;
   std::vector<std::unique_ptr<fcl::CollisionObjectd>> objects;
   std::unordered_set<const fcl::CollisionObjectd*> object_pointers;
@@ -215,9 +219,13 @@ template <typename T>
 struct FilamentFilamentCollisionCallbackData {
   FilamentFilamentCollisionCallbackData(
       const std::vector<GeometryId>* filament_index_to_id_in,
-      const FilamentSelfContactFilter* self_contact_filter_in)
+      const FilamentSelfContactFilter* self_contact_filter_in,
+      const FilamentSoftGeometry* filament_soft_geometry_A_in,
+      const FilamentSoftGeometry* filament_soft_geometry_B_in)
       : filament_index_to_id(filament_index_to_id_in),
-        self_contact_filter(self_contact_filter_in) {
+        self_contact_filter(self_contact_filter_in),
+        filament_soft_geometry_A(filament_soft_geometry_A_in),
+        filament_soft_geometry_B(filament_soft_geometry_B_in) {
     DRAKE_THROW_UNLESS(filament_index_to_id != nullptr);
     request.num_max_contacts = 1;
     request.enable_contact = true;
@@ -232,6 +240,10 @@ struct FilamentFilamentCollisionCallbackData {
   /* Self-contact filter to detemine if two edges of the same filament should
    detect collision. Is nullptr if two edges belong to different filaments. */
   const FilamentSelfContactFilter* const self_contact_filter;
+  /* Filament soft geometry for generating meshes and hydroelastic pressures for
+   filament segments. */
+  const FilamentSoftGeometry* const filament_soft_geometry_A;
+  const FilamentSoftGeometry* const filament_soft_geometry_B;
 
   /* Write the contact result to this field. */
   struct ContactResult {
@@ -240,6 +252,7 @@ struct FilamentFilamentCollisionCallbackData {
     std::vector<T> signed_distances;
     std::vector<int> contact_edge_indexes_A;
     std::vector<int> contact_edge_indexes_B;
+    std::vector<std::unique_ptr<ContactSurface<T>>> contact_surfaces;
   } contact_result;
 };
 
@@ -254,12 +267,13 @@ bool FilamentFilamentCollisionCallback(fcl::CollisionObjectd* object_A,
 
   auto data_A = FilamentEdgeData::read_from(*object_A);
   auto data_B = FilamentEdgeData::read_from(*object_B);
-  if ((filament_index_to_id.at(data_A.filament_index()).get_value() >
-       filament_index_to_id.at(data_B.filament_index()).get_value()) ||
-      (data_A.filament_index() == data_B.filament_index() &&
-       data_A.edge_index() > data_B.edge_index())) {
+  GeometryId id_A = filament_index_to_id.at(data_A.filament_index());
+  GeometryId id_B = filament_index_to_id.at(data_B.filament_index());
+  if ((id_A.get_value() > id_B.get_value()) ||
+      (id_A == id_B && data_A.edge_index() > data_B.edge_index())) {
     std::swap(object_A, object_B);
     std::swap(data_A, data_B);
+    std::swap(id_A, id_B);
   }
 
   if (data_A.filament_index() == data_B.filament_index()) {
@@ -273,18 +287,37 @@ bool FilamentFilamentCollisionCallback(fcl::CollisionObjectd* object_A,
     }
   }
 
-  fcl::CollisionResultd result;
-  fcl::collide(object_A, object_B, callback_data->request, result);
-  if (!result.isCollision()) {
+  if (callback_data->filament_soft_geometry_A == nullptr ||
+      callback_data->filament_soft_geometry_B == nullptr) {
+    fcl::CollisionResultd result;
+    fcl::collide(object_A, object_B, callback_data->request, result);
+    if (!result.isCollision()) return false;
+    const fcl::Contactd& contact = result.getContact(0);
+    auto& contact_result = callback_data->contact_result;
+    contact_result.p_WCs.emplace_back(contact.pos);
+    contact_result.nhats_BA_W.emplace_back(-contact.normal);
+    contact_result.signed_distances.emplace_back(-contact.penetration_depth);
+    contact_result.contact_edge_indexes_A.push_back(data_A.edge_index());
+    contact_result.contact_edge_indexes_B.push_back(data_B.edge_index());
     return false;
   }
-  const fcl::Contactd& contact = result.getContact(0);
+
+  hydroelastic::SoftGeometry soft_geometry_A =
+      callback_data->filament_soft_geometry_A->MakeSoftGeometryForEdge(
+          data_A.edge_index());
+  hydroelastic::SoftGeometry soft_geometry_B =
+      callback_data->filament_soft_geometry_B->MakeSoftGeometryForEdge(
+          data_B.edge_index());
+  std::unique_ptr<ContactSurface<T>> contact_surface =
+      hydroelastic::CalcCompliantCompliant(
+          soft_geometry_A, math::RigidTransformd::Identity(), id_A,
+          soft_geometry_B, math::RigidTransformd::Identity(), id_B,
+          HydroelasticContactRepresentation::kPolygon);
+  if (contact_surface == nullptr) return false;
   auto& contact_result = callback_data->contact_result;
-  contact_result.p_WCs.emplace_back(contact.pos);
-  contact_result.nhats_BA_W.emplace_back(-contact.normal);
-  contact_result.signed_distances.emplace_back(-contact.penetration_depth);
   contact_result.contact_edge_indexes_A.push_back(data_A.edge_index());
   contact_result.contact_edge_indexes_B.push_back(data_B.edge_index());
+  contact_result.contact_surfaces.emplace_back(std::move(contact_surface));
   return false;
 }
 
@@ -294,11 +327,18 @@ struct FilamentRigidCollisionCallbackData {
       const CollisionFilter* collision_filter_in,
       const std::vector<GeometryId>* filament_index_to_id_in,
       const std::unordered_set<const fcl::CollisionObjectd*>*
-          filament_objects_in)
+          filament_objects_in,
+      const FilamentSoftGeometry* const filament_soft_geometry_in,
+      const hydroelastic::Geometries* hydroelastic_geometries_in)
       : collision_filter(collision_filter_in),
         filament_index_to_id(filament_index_to_id_in),
-        filament_objects(filament_objects_in) {
+        filament_objects(filament_objects_in),
+        filament_soft_geometry(filament_soft_geometry_in),
+        hydroelastic_geometries(hydroelastic_geometries_in) {
+    DRAKE_THROW_UNLESS(collision_filter != nullptr);
+    DRAKE_THROW_UNLESS(filament_index_to_id != nullptr);
     DRAKE_THROW_UNLESS(filament_objects != nullptr);
+    DRAKE_THROW_UNLESS(hydroelastic_geometries != nullptr);
     request.num_max_contacts = 1;
     request.enable_contact = true;
     request.gjk_tolerance = 2e-12;
@@ -315,12 +355,18 @@ struct FilamentRigidCollisionCallbackData {
   /* All collision objects in the filament. */
   const std::unordered_set<const fcl::CollisionObjectd*>* const
       filament_objects;
+  /* Filament soft geometry for generating meshes and hydroelastic pressures for
+   filament segments. */
+  const FilamentSoftGeometry* const filament_soft_geometry;
+  /* Hydroelastic representations of regid geometries. */
+  const hydroelastic::Geometries* const hydroelastic_geometries;
 
   struct ContactResults {
     std::vector<Vector3<T>> p_WCs;
     std::vector<Vector3<T>> nhats_BA_W;
     std::vector<T> signed_distances;
     std::vector<int> contact_edge_indexes_A;
+    std::vector<std::unique_ptr<ContactSurface<T>>> contact_surfaces;
   };
   /* Write the contact result to this field. */
   std::unordered_map<GeometryId, ContactResults> id_B_to_contact_result;
@@ -337,16 +383,18 @@ bool FilamentRigidCollisionCallback(fcl::CollisionObjectd* object_A,
       *callback_data->filament_index_to_id;
   const std::unordered_set<const fcl::CollisionObjectd*>& filament_objects =
       *callback_data->filament_objects;
+  const hydroelastic::Geometries& hydroelastic_geometries =
+      *callback_data->hydroelastic_geometries;
 
   DRAKE_ASSERT(filament_objects.contains(object_A) ^
                filament_objects.contains(object_B));
   if (filament_objects.contains(object_B)) {
     std::swap(object_A, object_B);
   }
-  auto data_A = FilamentEdgeData::read_from(*object_A);
-  GeometryId id_A = filament_index_to_id.at(data_A.filament_index());
-  auto data_B = EncodedData(*object_B);
-  GeometryId id_B = data_B.id();
+  const auto data_A = FilamentEdgeData::read_from(*object_A);
+  const GeometryId id_A = filament_index_to_id.at(data_A.filament_index());
+  const auto data_B = EncodedData(*object_B);
+  const GeometryId id_B = data_B.id();
 
   if (!collision_filter.CanCollideWith(id_A, id_B)) {
     /* NOTE: Here and below, false is returned regardless of whether collision
@@ -355,17 +403,48 @@ bool FilamentRigidCollisionCallback(fcl::CollisionObjectd* object_A,
     return false;
   }
 
-  fcl::CollisionResultd result;
-  fcl::collide(object_A, object_B, callback_data->request, result);
-  if (!result.isCollision()) {
+  const HydroelasticType hydroelastic_type_B =
+      hydroelastic_geometries.hydroelastic_type(id_B);
+  if (callback_data->filament_soft_geometry == nullptr ||
+      hydroelastic_type_B == HydroelasticType::kUndefined) {
+    fcl::CollisionResultd result;
+    fcl::collide(object_A, object_B, callback_data->request, result);
+    if (!result.isCollision()) return false;
+    const fcl::Contactd& contact = result.getContact(0);
+    auto& contact_result = callback_data->id_B_to_contact_result[id_B];
+    contact_result.p_WCs.emplace_back(contact.pos);
+    contact_result.nhats_BA_W.emplace_back(-contact.normal);
+    contact_result.signed_distances.emplace_back(-contact.penetration_depth);
+    contact_result.contact_edge_indexes_A.push_back(data_A.edge_index());
     return false;
   }
-  const fcl::Contactd& contact = result.getContact(0);
+
+  hydroelastic::SoftGeometry soft_geometry_A =
+      callback_data->filament_soft_geometry->MakeSoftGeometryForEdge(
+          data_A.edge_index());
+  std::unique_ptr<ContactSurface<T>> contact_surface = [&]() {
+    math::RigidTransformd X_WB(object_B->getTransform());
+    if (hydroelastic_type_B == HydroelasticType::kSoft) {
+      const hydroelastic::SoftGeometry& soft_geometry_B =
+          hydroelastic_geometries.soft_geometry(id_B);
+      return hydroelastic::CalcCompliantCompliant(
+          soft_geometry_A, math::RigidTransformd::Identity(), id_A,
+          soft_geometry_B, X_WB, id_B,
+          HydroelasticContactRepresentation::kPolygon);
+    } else {
+      const hydroelastic::RigidGeometry& rigid_geometry_B =
+          hydroelastic_geometries.rigid_geometry(id_B);
+      return hydroelastic::CalcRigidCompliant(
+          soft_geometry_A, math::RigidTransformd::Identity(), id_A,
+          rigid_geometry_B, X_WB, id_B,
+          HydroelasticContactRepresentation::kPolygon);
+    }
+  }();
+
+  if (contact_surface == nullptr) return false;
   auto& contact_result = callback_data->id_B_to_contact_result[id_B];
-  contact_result.p_WCs.emplace_back(contact.pos);
-  contact_result.nhats_BA_W.emplace_back(-contact.normal);
-  contact_result.signed_distances.emplace_back(-contact.penetration_depth);
   contact_result.contact_edge_indexes_A.push_back(data_A.edge_index());
+  contact_result.contact_surfaces.emplace_back(std::move(contact_surface));
   return false;
 }
 
@@ -383,12 +462,20 @@ class Geometries::Impl {
     const int num_nodes = node_pos.cols();
     const int num_edges = edge_m1.cols();
 
+    std::optional<HydroelasticParams> hydroelastic_params =
+        ParseHydroelasticParams(props);
+
     FilamentData& filament_data =
         id_to_filament_data_
             .emplace(id, FilamentData(filament.closed(), num_nodes, num_edges))
             .first->second;
+    const Vector3d margins = hydroelastic_params
+                                 ? Vector3d(hydroelastic_params->margin,
+                                            hydroelastic_params->margin, 0)
+                                 : Vector3d::Zero();
 
     filament_data.node_positions = node_pos;
+    filament_data.margins = margins;
     filament_data.objects.resize(num_edges);
 
     filament_index_to_id_.push_back(id);
@@ -409,7 +496,7 @@ class Geometries::Impl {
           RotationMatrixd::MakeFromOrthonormalColumns(m1, t.cross(m1), t),
           (node_i + node_ip1) / 2);
 
-      std::unique_ptr<fcl::CollisionGeometryd> shape;
+      std::shared_ptr<fcl::CollisionGeometryd> shape;
       const auto& cs = filament.cross_section();
       if (std::holds_alternative<Filament::CircularCrossSection>(cs)) {
         const auto& circ_cs = std::get<Filament::CircularCrossSection>(cs);
@@ -418,9 +505,16 @@ class Geometries::Impl {
         const auto& rect_cs = std::get<Filament::RectangularCrossSection>(cs);
         shape = std::make_unique<fcl::Boxd>(rect_cs.width, rect_cs.height, l);
       }
+      filament_data.objects[i] =
+          std::make_unique<fcl::CollisionObjectd>(shape, X_WM.GetAsIsometry3());
 
-      filament_data.objects[i] = std::make_unique<fcl::CollisionObjectd>(
-          std::move(shape), X_WM.GetAsIsometry3());
+      /* CollisionObject constructors resets bounding box of CollisionGeometry.
+       Therefore, modifying the local bounding box must be done after that. */
+      shape->computeLocalAABB();
+      shape->aabb_local.max_ += margins;
+      shape->aabb_local.min_ -= margins;
+      shape->aabb_radius = (shape->aabb_local.min_ - shape->aabb_center).norm();
+      filament_data.objects[i]->computeAABB();
 
       FilamentEdgeData filament_edge_data(filament_index, i);
       filament_edge_data.write_to(filament_data.objects[i].get());
@@ -440,8 +534,6 @@ class Geometries::Impl {
                               }},
                    filament.cross_section()));
 
-    std::optional<HydroelasticParams> hydroelastic_params =
-        ParseHydroelasticParams(props);
     if (hydroelastic_params) {
       filament_data.soft_geometry = FilamentSoftGeometry(
           filament, hydroelastic_params->hydroelastic_modulus,
@@ -464,6 +556,7 @@ class Geometries::Impl {
     if (filament_data.soft_geometry) {
       filament_data.soft_geometry->UpdateConfigurationVector(q_WG);
     }
+    const Vector3d& margins = filament_data.margins;
 
     for (int i = 0; i < num_edges; ++i) {
       const int ip1 = (i + 1) % num_nodes;
@@ -497,6 +590,9 @@ class Geometries::Impl {
         DRAKE_UNREACHABLE();
       }
       shape->computeLocalAABB();
+      shape->aabb_local.max_ += margins;
+      shape->aabb_local.min_ -= margins;
+      shape->aabb_radius = (shape->aabb_local.min_ - shape->aabb_center).norm();
       object.setTransform(X_WM.GetAsIsometry3());
       object.computeAABB();
     }
@@ -505,7 +601,8 @@ class Geometries::Impl {
 
   FilamentContact<double> ComputeFilamentContact(
       const CollisionFilter& collision_filter,
-      const std::vector<const void*>& rigid_body_trees_in) const {
+      const std::vector<const void*>& rigid_body_trees_in,
+      const hydroelastic::Geometries* hydroelastic_geometries) const {
     std::vector<const fcl::DynamicAABBTreeCollisionManagerd*> rigid_body_trees;
     for (const void* rigid_body_tree : rigid_body_trees_in) {
       DRAKE_THROW_UNLESS(rigid_body_tree != nullptr);
@@ -513,6 +610,7 @@ class Geometries::Impl {
           static_cast<const fcl::DynamicAABBTreeCollisionManagerd*>(
               rigid_body_tree));
     }
+    DRAKE_THROW_UNLESS(hydroelastic_geometries != nullptr);
     FilamentContact<double> filament_contact;
 
     const auto cbegin = id_to_filament_data_.cbegin();
@@ -527,8 +625,9 @@ class Geometries::Impl {
     }
     for (auto iter = cbegin; iter != cend; ++iter) {
       GeometryId id_A = iter->first;
-      AddFilamentRigidContactGeometryPairs(id_A, rigid_body_trees,
-                                           collision_filter, &filament_contact);
+      AddFilamentRigidContactGeometryPairs(
+          id_A, collision_filter, rigid_body_trees, hydroelastic_geometries,
+          &filament_contact);
     }
     return filament_contact;
   }
@@ -550,6 +649,9 @@ class Geometries::Impl {
           clone->id_to_filament_data_
               .emplace(id, FilamentData(closed, num_nodes, num_edges))
               .first->second;
+
+      filament_data_clone.node_positions = filament_data_source.node_positions;
+      filament_data_clone.margins = filament_data_source.margins;
       filament_data_clone.objects.resize(num_edges);
 
       for (int i = 0; i < num_edges; ++i) {
@@ -579,8 +681,11 @@ class Geometries::Impl {
     const FilamentData& filament_data_B = id_to_filament_data_.at(id_B);
     FilamentFilamentCollisionCallbackData<double> callback_data(
         &filament_index_to_id_,
-        (id_A == id_B) ? &filament_data_A.self_contact_filter.value()
-                       : nullptr);
+        (id_A == id_B) ? &filament_data_A.self_contact_filter.value() : nullptr,
+        filament_data_A.soft_geometry ? &filament_data_A.soft_geometry.value()
+                                      : nullptr,
+        filament_data_B.soft_geometry ? &filament_data_B.soft_geometry.value()
+                                      : nullptr);
     if (id_A == id_B) {
       filament_data_A.tree.collide(&callback_data,
                                    &FilamentFilamentCollisionCallback<double>);
@@ -589,39 +694,57 @@ class Geometries::Impl {
                  &FilamentFilamentCollisionCallback<double>);
     }
     auto& contact_result = callback_data.contact_result;
-    if (contact_result.p_WCs.empty()) return;
-    filament_contact->AddFilamentFilamentContactGeometryPair(
-        id_A, id_B, std::move(contact_result.p_WCs),
-        std::move(contact_result.nhats_BA_W),
-        std::move(contact_result.signed_distances),
-        std::move(contact_result.contact_edge_indexes_A),
-        std::move(contact_result.contact_edge_indexes_B),
-        filament_data_A.node_positions, filament_data_B.node_positions);
+    if (contact_result.contact_edge_indexes_A.empty()) return;
+    if (contact_result.contact_surfaces.empty()) {
+      filament_contact->AddFilamentFilamentContactGeometryPair(
+          id_A, id_B, std::move(contact_result.p_WCs),
+          std::move(contact_result.nhats_BA_W),
+          std::move(contact_result.signed_distances),
+          std::move(contact_result.contact_edge_indexes_A),
+          std::move(contact_result.contact_edge_indexes_B),
+          filament_data_A.node_positions, filament_data_B.node_positions);
+    } else {
+      filament_contact->AddFilamentFilamentContactGeometryPair(
+          id_A, id_B, contact_result.contact_surfaces,
+          contact_result.contact_edge_indexes_A,
+          contact_result.contact_edge_indexes_B, filament_data_A.node_positions,
+          filament_data_B.node_positions);
+    }
   }
 
   void AddFilamentRigidContactGeometryPairs(
-      GeometryId id_A,
+      GeometryId id_A, const CollisionFilter& collision_filter,
       const std::vector<const fcl::DynamicAABBTreeCollisionManagerd*>&
           rigid_body_trees,
-      const CollisionFilter& collision_filter,
+      const hydroelastic::Geometries* hydroelastic_geometries,
       FilamentContact<double>* filament_contact) const {
     const FilamentData& filament_data = id_to_filament_data_.at(id_A);
     FilamentRigidCollisionCallbackData<double> callback_data(
         &collision_filter, &filament_index_to_id_,
-        &filament_data.object_pointers);
+        &filament_data.object_pointers,
+        filament_data.soft_geometry ? &filament_data.soft_geometry.value()
+                                    : nullptr,
+        hydroelastic_geometries);
     for (const auto rigid_body_tree : rigid_body_trees) {
       FclCollide(filament_data.tree, *rigid_body_tree, &callback_data,
                  &FilamentRigidCollisionCallback<double>);
     }
     for (const auto& [id_B, contact_result] :
          callback_data.id_B_to_contact_result) {
-      if (contact_result.p_WCs.empty()) continue;
-      filament_contact->AddFilamentRigidContactGeometryPair(
-          id_A, id_B, std::move(contact_result.p_WCs),
-          std::move(contact_result.nhats_BA_W),
-          std::move(contact_result.signed_distances),
-          std::move(contact_result.contact_edge_indexes_A),
-          filament_data.node_positions);
+      if (contact_result.contact_edge_indexes_A.empty()) continue;
+      if (contact_result.contact_surfaces.empty()) {
+        filament_contact->AddFilamentRigidContactGeometryPair(
+            id_A, id_B, std::move(contact_result.p_WCs),
+            std::move(contact_result.nhats_BA_W),
+            std::move(contact_result.signed_distances),
+            std::move(contact_result.contact_edge_indexes_A),
+            filament_data.node_positions);
+      } else {
+        filament_contact->AddFilamentRigidContactGeometryPair(
+            id_A, id_B, contact_result.contact_surfaces,
+            contact_result.contact_edge_indexes_A,
+            filament_data.node_positions);
+      }
     }
   }
 
@@ -669,9 +792,11 @@ void Geometries::UpdateFilamentConfigurationVector(
 
 FilamentContact<double> Geometries::ComputeFilamentContact(
     const CollisionFilter& collision_filter,
-    const std::vector<const void*>& rigid_body_trees) const {
+    const std::vector<const void*>& rigid_body_trees,
+    const hydroelastic::Geometries* hydroelastic_geometries) const {
   DRAKE_DEMAND(impl_ != nullptr);
-  return impl_->ComputeFilamentContact(collision_filter, rigid_body_trees);
+  return impl_->ComputeFilamentContact(collision_filter, rigid_body_trees,
+                                       hydroelastic_geometries);
 }
 
 bool Geometries::is_filament(GeometryId id) const {

@@ -12,6 +12,12 @@
 namespace drake {
 namespace geometry {
 namespace internal {
+
+/* Forward declaration. */
+namespace hydroelastic {
+class Geometries;
+}
+
 namespace filament {
 
 class Geometries {
@@ -56,10 +62,13 @@ class Geometries {
                             geometries can collide, with the exception that
                             filament self-contact is always enabled.
    @param rigid_body_trees  Pointers to fcl::DynamicAABBTreeCollisionManagerd
-                            trees containing rigid body geometries. */
+                            trees containing rigid body geometries.
+   @pre `tree != nullptr` for all `tree` in `rigid_body_trees`.
+   @pre `hydroelastic_geometries != nullptr`. */
   FilamentContact<double> ComputeFilamentContact(
       const CollisionFilter& collision_filter,
-      const std::vector<const void*>& rigid_body_trees) const;
+      const std::vector<const void*>& rigid_body_trees,
+      const hydroelastic::Geometries* hydroelastic_geometries) const;
 
   /* Returns true if a filament geometry with the given `id` exists. */
   bool is_filament(GeometryId id) const;

@@ -376,10 +376,12 @@ drake_cc_library(
     implementation_deps = [
         ":filament_self_contact_filter",
         ":filament_soft_geometry",
+        ":hydroelastic_calculator",
         ":proximity_utilities",
         "//common:overloaded",
         "//common:type_safe_index",
         "//geometry:proximity_properties",
+        "//geometry/proximity:hydroelastic_internal",
         "//math:geometric_transform",
         "//math:vector3_util",
         "@fcl_internal//:fcl",
@@ -1372,6 +1374,7 @@ drake_cc_googletest(
         ":filament_contact_internal",
         "//common/test_utilities:eigen_matrix_compare",
         "//geometry:proximity_engine",
+        "//geometry:proximity_properties",
     ],
 )
 
