@@ -4,6 +4,7 @@
 #include <gflags/gflags.h>
 
 #include "drake/common/find_resource.h"
+#include "drake/examples/multibody/filament/filament_common.h"
 #include "drake/geometry/drake_visualizer.h"
 #include "drake/geometry/proximity_properties.h"
 #include "drake/multibody/plant/multibody_plant.h"
@@ -30,6 +31,7 @@ DEFINE_string(contact_approximation, "lagged",
 
 namespace drake {
 namespace examples {
+namespace filament {
 namespace {
 
 using drake::geometry::Filament;
@@ -53,32 +55,6 @@ using Eigen::Vector4d;
 using Eigen::VectorXd;
 using math::RigidTransformd;
 using math::RotationMatrixd;
-
-Eigen::Matrix3Xd ReadPointsData(const std::string& path) {
-  const std::string& filename = FindResourceOrThrow(path);
-  std::ifstream infile(filename);
-  if (!infile) {
-    throw std::runtime_error(
-        fmt::format("Failed to open file \"{}\"", filename));
-  }
-
-  std::vector<Eigen::Vector3d> points;
-  std::string line;
-  while (std::getline(infile, line)) {
-    std::istringstream iss(line);
-    double x, y, z;
-    if (!(iss >> x >> y >> z)) {
-      throw std::runtime_error(fmt::format("Invalid line \"{}\"", line));
-    }
-    points.emplace_back(x, y, z);
-  }
-
-  Eigen::Matrix3Xd mat(3, ssize(points));
-  for (int i = 0; i < ssize(points); ++i) {
-    mat.col(i) = points[i];
-  }
-  return mat;
-}
 
 class ConstantPullingForce final : public ForceDensityField<double> {
  public:
@@ -120,13 +96,7 @@ class ConstantPullingForce final : public ForceDensityField<double> {
 };
 
 DeformableBodyId RegisterFilament(DeformableModel<double>* deformable_model) {
-  const Eigen::Matrix3Xd node_positions = ReadPointsData(fmt::format(
-      "drake/examples/multibody/filament/knot_configurations/{}.txt",
-      FLAGS_knot_configuration));
-  const double diameter = 3e-3;
-
-  Filament filament(false, node_positions,
-                    Filament::CircularCrossSection{.diameter = diameter});
+  Filament filament = LoadFilament(FLAGS_knot_configuration);
 
   auto geometry_instance = std::make_unique<geometry::GeometryInstance>(
       RigidTransformd::Identity(), filament, "filament_with_knot");
@@ -188,6 +158,7 @@ int do_main() {
 }
 
 }  // namespace
+}  // namespace filament
 }  // namespace examples
 }  // namespace drake
 
@@ -197,5 +168,5 @@ int main(int argc, char* argv[]) {
       "tying. Refer to README for instructions on meldis as well as optional "
       "flags.");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  return drake::examples::do_main();
+  return drake::examples::filament::do_main();
 }

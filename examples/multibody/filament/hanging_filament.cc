@@ -27,6 +27,7 @@ DEFINE_string(contact_approximation, "lagged",
 
 namespace drake {
 namespace examples {
+namespace filament {
 namespace {
 
 using drake::geometry::Cylinder;
@@ -143,6 +144,7 @@ int do_main() {
 }
 
 }  // namespace
+}  // namespace filament
 }  // namespace examples
 }  // namespace drake
 
@@ -152,5 +154,5 @@ int main(int argc, char* argv[]) {
       "a deformable filament. Refer to README for instructions on meldis as "
       "well as optional flags.");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
-  return drake::examples::do_main();
+  return drake::examples::filament::do_main();
 }
