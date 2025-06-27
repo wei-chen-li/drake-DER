@@ -562,7 +562,7 @@ DeformableDriver<T>::ComputeContactDataForFilament(
     const T w0 = std::get<0>(kinematic_weights);
     const Vector3<T> w1 = std::get<1>(kinematic_weights);
     const T w2 = std::get<2>(kinematic_weights);
-    /* If the a node or an edge is under BC, the corresponding jacobian block is
+    /* If the a node or an edge is fixed, the corresponding jacobian block is
      zero because the vertex doesn't contribute to the contact velocity. */
     if (!der_model.IsPositionFixed(index0)) {
       v_WGc += w0 * body_participating_v0.template segment<3>(permuted_dof0);
@@ -957,22 +957,56 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
       const T v_AcBc_Cz = nhat_AB_W.dot(v_WBc - v_WAc);
 
       const T phi0 = geometry_pair.signed_distances()[i];
+      /* If the signed distance is too large, caused by an illformed
+       hydroelastic gradient, ignore it. */
+      if (!std::isfinite(phi0) || std::abs(phi0) > 1e6) {
+        continue;
+      }
+      /* For small polygons, the normals my be badly computed. Therefore, we
+       ignore them. */
+      if (geometry_pair.is_patch_contact() &&
+          geometry_pair.areas()[i] < 1e-14) {
+        continue;
+      }
 
-      double default_stiffness = manager_->default_contact_stiffness();
-      if (default_stiffness == 0.0) default_stiffness = 1e5;
-      // TODO(wei-chen): Find a default stiffness from filaments.
-      const T stiffness_A =
-          GetPointContactStiffness(id_A, default_stiffness, inspector);
-      const T stiffness_B =
-          GetPointContactStiffness(id_B, default_stiffness, inspector);
-      const T k = GetCombinedPointContactStiffness(stiffness_A, stiffness_B);
+      const auto [fn0, stiffness, damping] = [&]() {
+        if (!geometry_pair.is_patch_contact()) {
+          double default_stiffness = manager_->default_contact_stiffness();
+          if (default_stiffness == 0.0) default_stiffness = 1e5;
+          // TODO(wei-chen): Find a default stiffness from filaments.
+          const T stiffness_A =
+              GetPointContactStiffness(id_A, default_stiffness, inspector);
+          const T stiffness_B =
+              GetPointContactStiffness(id_B, default_stiffness, inspector);
+          const T k =
+              GetCombinedPointContactStiffness(stiffness_A, stiffness_B);
 
-      const T fn0 = -k * phi0;
+          const T fn = -k * phi0;
 
-      const double default_dissipation =
-          manager_->default_contact_dissipation();
-      const T d = GetCombinedHuntCrossleyDissipation(
-          id_A, id_B, stiffness_A, stiffness_B, default_dissipation, inspector);
+          const T d = GetCombinedHuntCrossleyDissipation(
+              id_A, id_B, stiffness_A, stiffness_B,
+              manager_->default_contact_dissipation(), inspector);
+
+          return std::make_tuple(fn, k, d);
+        } else {
+          const double A = geometry_pair.areas()[i];
+          const double p = geometry_pair.pressures()[i];
+
+          const T fn = A * p;
+          const T k = -fn / phi0;
+
+          const T hydro_modulus_A = GetHydroelasticModulus(
+              id_A, std::numeric_limits<double>::infinity(), inspector);
+          const T hydro_modulus_B = GetHydroelasticModulus(
+              id_B, std::numeric_limits<double>::infinity(), inspector);
+
+          const T d = GetCombinedHuntCrossleyDissipation(
+              id_A, id_B, hydro_modulus_A, hydro_modulus_B,
+              manager_->default_contact_dissipation(), inspector);
+
+          return std::make_tuple(fn, k, d);
+        }
+      }();
 
       const double default_dissipation_time_constant = 0.1;
       const T tau = GetCombinedDissipationTimeConstant(
@@ -996,8 +1030,8 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
           .phi0 = phi0,
           .vn0 = v_AcBc_Cz,
           .fn0 = fn0,
-          .stiffness = k,
-          .damping = d,
+          .stiffness = stiffness,
+          .damping = damping,
           .dissipation_time_scale = tau,
           .friction_coefficient = mu};
       result->AppendDeformableData(std::move(contact_pair));
