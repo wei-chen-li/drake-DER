@@ -20,6 +20,7 @@ DEFINE_double(length, 0.6, "Length of the rope [m].");
 DEFINE_double(diameter, 0.015, "Diameter of the rope [m].");
 DEFINE_int32(num_edges, 50,
              "Number of edges the rope is spatially discretized.");
+DEFINE_bool(self_contact, true, "Whether self contact resolution is enabled.");
 DEFINE_double(ball_mass, 1e-3, "Mass of the ball [kg].");
 DEFINE_double(ball_radius, 0.03, "Radius of the ball [m].");
 DEFINE_string(contact_approximation, "lagged",
@@ -79,6 +80,7 @@ DeformableBodyId RegisterRope(DeformableModel<double>* deformable_model) {
   geometry::ProximityProperties proximity_props;
   const CoulombFriction<double> surface_friction(0.8, 0.8);
   AddContactMaterial({}, {}, surface_friction, &proximity_props);
+  proximity_props.AddProperty("collision", "self_contact", FLAGS_self_contact);
   geometry_instance->set_proximity_properties(proximity_props);
 
   /* Set the material properties. Notice G = E / 2(1+𝜈). */

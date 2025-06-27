@@ -524,15 +524,20 @@ class Geometries::Impl {
     }
     filament_data.tree.setup();
 
-    filament_data.self_contact_filter = FilamentSelfContactFilter(
-        filament.closed(), edge_lengths,
-        std::visit(overloaded{[](const Filament::CircularCrossSection& cs) {
-                                return cs.diameter;
-                              },
-                              [](const Filament::RectangularCrossSection& cs) {
-                                return std::hypot(cs.width, cs.height);
-                              }},
-                   filament.cross_section()));
+    const bool enable_self_contact =
+        props.GetPropertyOrDefault("collision", "self_contact", true);
+    if (enable_self_contact) {
+      filament_data.self_contact_filter = FilamentSelfContactFilter(
+          filament.closed(), edge_lengths,
+          std::visit(
+              overloaded{[](const Filament::CircularCrossSection& cs) {
+                           return cs.diameter;
+                         },
+                         [](const Filament::RectangularCrossSection& cs) {
+                           return std::hypot(cs.width, cs.height);
+                         }},
+              filament.cross_section()));
+    }
 
     if (hydroelastic_params) {
       filament_data.soft_geometry = FilamentSoftGeometry(
@@ -679,6 +684,9 @@ class Geometries::Impl {
     if (id_A.get_value() > id_B.get_value()) std::swap(id_A, id_B);
     const FilamentData& filament_data_A = id_to_filament_data_.at(id_A);
     const FilamentData& filament_data_B = id_to_filament_data_.at(id_B);
+    /* Premature return if self contact is disabled. */
+    if (id_A == id_B && !filament_data_A.self_contact_filter) return;
+
     FilamentFilamentCollisionCallbackData<double> callback_data(
         &filament_index_to_id_,
         (id_A == id_B) ? &filament_data_A.self_contact_filter.value() : nullptr,

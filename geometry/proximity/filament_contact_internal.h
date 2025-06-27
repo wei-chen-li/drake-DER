@@ -31,11 +31,23 @@ class Geometries {
 
   ~Geometries();
 
+  // clang-format off
   /* Adds a filament geometry
    @param id        The unique identifier for the geometry.
    @param filament  The filament with information on number of nodes and edges,
                     and cross-section.
-   @pre There is no previous geometry associated with `id`. */
+   @param props     The proximity properties. See table below.
+   @pre There is no previous geometry associated with `id`.
+
+   |  Group name  |    Property Name     |  Property Type   | Property Description                    |
+   | :----------: | :------------------: | :--------------: | :-------------------------------------- |
+   | hydroelastic | compliance_type      | HydroelasticType | Must be HydroelasticType::kCompliant.   |
+   | hydroelastic | hydroelastic_modulus | double           | Hydroelastic modulus.                   |
+   | hydroelastic | resolution_hint      | double           | Resolution hint.                        |
+   | hydroelastic | margin               | double           | Hydroelastic margin (default 0).        |
+   | collision    | self_contact         | bool             | Is self contact enabled (default true). |
+   */
+  // clang-format on
   void AddFilamentGeometry(GeometryId id, const Filament& filament,
                            const ProximityProperties& props);
 
@@ -60,7 +72,9 @@ class Geometries {
    geometries are up to date.
    @param collision_filter  The collision filter used to determine if two
                             geometries can collide, with the exception that
-                            filament self-contact is always enabled.
+                            whether filament self-contact is enabled/disabled
+                            is determined by the AddFilamentGeometry() proximity
+                            property ('collision','self_contact').
    @param rigid_body_trees  Pointers to fcl::DynamicAABBTreeCollisionManagerd
                             trees containing rigid body geometries.
    @pre `tree != nullptr` for all `tree` in `rigid_body_trees`.
