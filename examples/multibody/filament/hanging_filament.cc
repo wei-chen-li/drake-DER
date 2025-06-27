@@ -20,6 +20,7 @@ DEFINE_double(diameter, 0.015, "Diameter of the filaments [m].");
 DEFINE_double(cylinder_diameter, 0.05, "Diameter of the cylinder [m].");
 DEFINE_int32(num_edges, 101,
              "Number of edges the filaments are spatially discretized.");
+DEFINE_double(hydroelastic_modulus, 1e4, "Hydroelastic modulus [Pa].");
 DEFINE_string(contact_approximation, "lagged",
               "Type of convex contact approximation. See "
               "multibody::DiscreteContactApproximation for details. Options "
@@ -80,6 +81,11 @@ DeformableBodyId RegisterFilament(DeformableModel<double>* deformable_model,
   geometry::ProximityProperties proximity_props;
   const CoulombFriction<double> surface_friction(0.8, 0.8);
   AddContactMaterial({}, {}, surface_friction, &proximity_props);
+  if (FLAGS_hydroelastic_modulus < 1e10) {
+    AddCompliantHydroelasticProperties(FLAGS_diameter * 0.4,
+                                       FLAGS_hydroelastic_modulus * 0.05,
+                                       &proximity_props);
+  }
   geometry_instance->set_proximity_properties(proximity_props);
 
   /* Set the material properties. Notice G = E / 2(1+𝜈). */
@@ -115,8 +121,8 @@ int do_main() {
 
   auto [plant, scene_graph] = AddMultibodyPlant(plant_config, &builder);
   DeformableModel<double>& deformable_model = plant.mutable_deformable_model();
-  DeformableBodyId id = RegisterFilament(
-      &deformable_model, Vector3d(0, -0.5, 0), Vector3d(0, 0.5, 0), true);
+  RegisterFilament(&deformable_model, Vector3d(0, -0.5, 0), Vector3d(0, 0.5, 0),
+                   true);
   const double z = (FLAGS_diameter / 2) + FLAGS_cylinder_diameter;
   RegisterFilament(&deformable_model, Vector3d(-0.5, 0, z),
                    Vector3d(0.5, 0, z));
@@ -129,16 +135,10 @@ int do_main() {
   auto diagram = builder.Build();
 
   Simulator<double> simulator(*diagram);
-  Context<double>& context = simulator.get_mutable_context();
-  Context<double>& plant_context =
-      diagram->GetMutableSubsystemContext(plant, &context);
-
   simulator.Initialize();
   simulator.set_target_realtime_rate(FLAGS_realtime_rate);
 
   simulator.AdvanceTo(FLAGS_simulation_time * 0.5);
-  deformable_model.Disable(id, &plant_context);
-  simulator.AdvanceTo(FLAGS_simulation_time);
 
   return 0;
 }

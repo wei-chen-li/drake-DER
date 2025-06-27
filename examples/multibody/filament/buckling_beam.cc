@@ -9,7 +9,7 @@
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/diagram_builder.h"
 
-DEFINE_double(simulation_time, 3.0, "Desired duration of the simulation [s].");
+DEFINE_double(simulation_time, 5.0, "Desired duration of the simulation [s].");
 DEFINE_double(realtime_rate, 1.0, "Desired real time rate.");
 DEFINE_double(time_step, 1e-3,
               "Discrete time step for the system [s]. Must be positive.");
@@ -21,6 +21,7 @@ DEFINE_double(diameter, 0.015, "Diameter of the rope [m].");
 DEFINE_int32(num_edges, 50,
              "Number of edges the rope is spatially discretized.");
 DEFINE_bool(self_contact, true, "Whether self contact resolution is enabled.");
+DEFINE_double(hydroelastic_modulus, 1e4, "Hydroelastic modulus [Pa].");
 DEFINE_double(ball_mass, 1e-3, "Mass of the ball [kg].");
 DEFINE_double(ball_radius, 0.03, "Radius of the ball [m].");
 DEFINE_string(contact_approximation, "lagged",
@@ -80,6 +81,11 @@ DeformableBodyId RegisterRope(DeformableModel<double>* deformable_model) {
   geometry::ProximityProperties proximity_props;
   const CoulombFriction<double> surface_friction(0.8, 0.8);
   AddContactMaterial({}, {}, surface_friction, &proximity_props);
+  if (FLAGS_hydroelastic_modulus < 1e10) {
+    AddCompliantHydroelasticProperties(FLAGS_diameter * 0.4,
+                                       FLAGS_hydroelastic_modulus * 0.05,
+                                       &proximity_props);
+  }
   proximity_props.AddProperty("collision", "self_contact", FLAGS_self_contact);
   geometry_instance->set_proximity_properties(proximity_props);
 
@@ -123,7 +129,7 @@ int do_main() {
   auto [plant, scene_graph] = AddMultibodyPlant(plant_config, &builder);
   DeformableModel<double>& deformable_model = plant.mutable_deformable_model();
   RegisterGround(&plant);
-  RegisterRope(&deformable_model);
+  DeformableBodyId id = RegisterRope(&deformable_model);
   plant.Finalize();
 
   /* Add a visualizer that emits LCM messages for visualization. */
@@ -133,9 +139,15 @@ int do_main() {
   auto diagram = builder.Build();
 
   Simulator<double> simulator(*diagram);
+  Context<double>& context = simulator.get_mutable_context();
+  Context<double>& plant_context =
+      diagram->GetMutableSubsystemContext(plant, &context);
+
   simulator.Initialize();
   simulator.set_target_realtime_rate(FLAGS_realtime_rate);
 
+  simulator.AdvanceTo(FLAGS_simulation_time * 0.6);
+  deformable_model.Disable(id, &plant_context);
   simulator.AdvanceTo(FLAGS_simulation_time);
 
   return 0;
