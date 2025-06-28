@@ -679,7 +679,7 @@ std::pair<T, int> SapSolver<T>::PerformExactLineSearch(
   // is robust with small changes in performances (about 30%). We then choose a
   // safe tolerance far enough from the lower limit (close to machine epsilon)
   // and the upper limit (close to an inexact method).
-  const double f_tolerance = 1.0e-5;  // f = −ℓ'(α)/ℓ'₀ is dimensionless.
+  const double f_tolerance = 1.0e-8;  // f = −ℓ'(α)/ℓ'₀ is dimensionless.
   const double alpha_tolerance = f_tolerance * alpha_guess;
   const auto [alpha, iters] = DoNewtonWithBisectionFallback(
       cost_and_gradient, bracket, alpha_guess, alpha_tolerance, f_tolerance,
