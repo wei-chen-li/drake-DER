@@ -73,11 +73,6 @@ Eigen::VectorXd ComputeFaceTangentToDistCvxh(
   }
 }
 
-// See Definition 1 in the paper.
-int unadaptive_test_samples(double epsilon, double delta, double tau) {
-  return static_cast<int>(-2 * std::log(delta) / (tau * tau * epsilon) + 0.5);
-}
-
 // Given a pointer to a MathematicalProgram and a single particle, check whether
 // the particle satisfies the constraints. If a nullptr is given for the
 // program, return true, since the constraints are trivially-satisfied.
@@ -147,7 +142,20 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
                      checker.num_allocated_contexts())
           : 1;
   log()->info("IrisZo using {} threads.", num_threads_to_use);
-  RandomGenerator generator(options.sampled_iris_options.random_seed);
+
+  const int num_threads_for_sampling =
+      options.sampled_iris_options.sample_particles_in_parallel
+          ? options.sampled_iris_options.parallelism.num_threads()
+          : 1;
+  std::vector<RandomGenerator> generators;
+  // This strategy for seeding multiple generators is acceptable, since Drake's
+  // RandomGenerator is a Mersenne Twister, where even nearby seeds are
+  // practically independent.
+  for (int generator_index = 0; generator_index < num_threads_for_sampling;
+       ++generator_index) {
+    generators.push_back(RandomGenerator(
+        options.sampled_iris_options.random_seed + generator_index));
+  }
 
   const Eigen::VectorXd starting_ellipsoid_center = starting_ellipsoid.center();
 
@@ -279,19 +287,14 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
 
   // Upper bound on number of particles required if we hit max iterations.
   double outer_delta_min =
-      options.sampled_iris_options.delta * 6 /
-      (M_PI * M_PI * options.sampled_iris_options.max_iterations *
-       options.sampled_iris_options.max_iterations);
-
-  double delta_min =
-      outer_delta_min * 6 /
-      (M_PI * M_PI *
-       options.sampled_iris_options.max_iterations_separating_planes *
-       options.sampled_iris_options.max_iterations_separating_planes);
-
-  int N_max =
-      unadaptive_test_samples(options.sampled_iris_options.epsilon, delta_min,
-                              options.sampled_iris_options.tau);
+      internal::calc_delta_min(options.sampled_iris_options.delta,
+                               options.sampled_iris_options.max_iterations);
+  double delta_min = internal::calc_delta_min(
+      outer_delta_min,
+      options.sampled_iris_options.max_iterations_separating_planes);
+  int N_max = internal::unadaptive_test_samples(
+      options.sampled_iris_options.epsilon, delta_min,
+      options.sampled_iris_options.tau);
 
   if (options.sampled_iris_options.verbose) {
     log()->info(
@@ -349,35 +352,37 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
     }
 
     // Separating Planes Step.
+    // TODO(cohnt): Rewrite as a for loop for better readability.
     while (num_iterations_separating_planes <
            options.sampled_iris_options.max_iterations_separating_planes) {
       int k_squared = num_iterations_separating_planes + 1;
       k_squared *= k_squared;
       double delta_k = outer_delta * 6 / (M_PI * M_PI * k_squared);
-      int N_k =
-          unadaptive_test_samples(options.sampled_iris_options.epsilon, delta_k,
-                                  options.sampled_iris_options.tau);
+      int N_k = internal::unadaptive_test_samples(
+          options.sampled_iris_options.epsilon, delta_k,
+          options.sampled_iris_options.tau);
 
-      particles.at(0) =
-          P.UniformSample(&generator, current_ellipsoid_center,
-                          options.sampled_iris_options.mixing_steps);
-      // Populate particles by uniform sampling.
-      for (int i = 1; i < N_k; ++i) {
-        particles.at(i) =
-            P.UniformSample(&generator, particles.at(i - 1),
-                            options.sampled_iris_options.mixing_steps);
-      }
+      // TODO(cohnt): Switch to using a single large MatrixXd to avoid repeated
+      // VectorXd heap allocations.
+      internal::PopulateParticlesByUniformSampling(
+          P, N_k, options.sampled_iris_options.mixing_steps, &generators,
+          &particles);
 
       // Copy top slice of particles, applying thet parameterization function to
       // each one, due to collision checker only accepting vectors of
       // configurations.
-      // TODO(wernerpe, cohnt): Remove this copy operation.
-      // TODO(cohnt): Consider parallelizing the parameterization calls, in case
-      // it's an expensive operation.
       std::vector<Eigen::VectorXd> ambient_particles(N_k);
-      std::transform(particles.begin(), particles.begin() + N_k,
-                     ambient_particles.begin(),
-                     options.parameterization.get_parameterization());
+      const auto apply_parameterization = [&particles, &ambient_particles,
+                                           &options](const int thread_num,
+                                                     const int64_t index) {
+        unused(thread_num);
+        ambient_particles[index] =
+            options.parameterization.get_parameterization()(particles[index]);
+      };
+
+      StaticParallelForIndexLoop(DegreeOfParallelism(num_threads_to_use), 0,
+                                 N_k, apply_parameterization,
+                                 ParallelForBackend::BEST_AVAILABLE);
 
       for (int i = 0; i < ssize(ambient_particles); ++i) {
         // Only run this check in debug mode, because it's expensive.
@@ -418,14 +423,37 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
                         options.sampled_iris_options.epsilon * N_k);
       }
 
-      if (number_particles_in_collision_unadaptive_test <=
+      const bool probabilistic_test_passed =
+          number_particles_in_collision_unadaptive_test <=
           (1 - options.sampled_iris_options.tau) *
-              options.sampled_iris_options.epsilon * N_k) {
+              options.sampled_iris_options.epsilon * N_k;
+
+      if (options.sampled_iris_options.verbose) {
+        if (!options.sampled_iris_options.remove_all_collisions_possible &&
+            probabilistic_test_passed) {
+          log()->info(
+              "IrisZo probabilistic test passed! Finished computing "
+              "hyperplanes.");
+          break;
+        } else if (probabilistic_test_passed) {
+          log()->info(
+              "IrisZo probabilistic test passed! Computing hyperplanes for "
+              "remaining particles, then this iteration is finished.");
+        } else {
+          log()->info(
+              "IrisZo probabilistic test failed! Continuing to compute "
+              "hyperplanes.");
+        }
+      }
+      if (!options.sampled_iris_options.remove_all_collisions_possible &&
+          probabilistic_test_passed) {
         break;
       }
 
-      if (num_iterations_separating_planes ==
-          options.sampled_iris_options.max_iterations_separating_planes - 1) {
+      const bool is_last_iteration =
+          (num_iterations_separating_planes + 1) >=
+          options.sampled_iris_options.max_iterations_separating_planes;
+      if (is_last_iteration && !probabilistic_test_passed) {
         log()->warn(
             "IrisZo WARNING, separating planes hit max iterations without "
             "passing the unadaptive test, this voids the probabilistic "
@@ -448,8 +476,7 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
                                          &constraints_tol](
                                             const int thread_num,
                                             const int64_t index) {
-        const int point_index = static_cast<int>(index);
-        auto start_point = particles_in_collision[point_index];
+        auto start_point = particles_in_collision[index];
 
         Eigen::VectorXd current_point = start_point;
         Eigen::VectorXd curr_pt_lower = current_ellipsoid_center;
@@ -487,7 +514,7 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
           }
         }
 
-        particles_in_collision_updated[point_index] = current_point;
+        particles_in_collision_updated[index] = current_point;
       };
 
       // Update all particles in parallel.
@@ -525,40 +552,43 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
       for (auto i : indices_sorted) {
         auto nearest_particle = particles_in_collision_updated[i];
         if (!particle_is_redundant[i]) {
-          Eigen::VectorXd a_face;
           if (options.sampled_iris_options.containment_points.has_value()) {
+            Eigen::VectorXd a_face;
             a_face = ComputeFaceTangentToDistCvxh(
                 current_ellipsoid, nearest_particle, cvxh_vpoly, *solver);
-          } else {
-            a_face = ATA * (nearest_particle - current_ellipsoid_center);
-          }
 
-          a_face.normalize();
-          double b_face =
-              a_face.transpose() * nearest_particle -
-              options.sampled_iris_options.configuration_space_margin;
+            a_face.normalize();
+            double b_face =
+                a_face.transpose() * nearest_particle -
+                options.sampled_iris_options.configuration_space_margin;
 
-          // Relax cspace margin to contain points.
-          if (options.sampled_iris_options.containment_points.has_value()) {
-            Eigen::VectorXd result =
-                a_face.transpose() *
-                options.sampled_iris_options.containment_points.value();
-            double relaxation = result.maxCoeff() - b_face;
-            if (relaxation > 0) {
-              b_face += relaxation;
-              if (max_relaxation < relaxation) max_relaxation = relaxation;
+            // Relax cspace margin to contain points.
+            if (options.sampled_iris_options.containment_points.has_value()) {
+              Eigen::VectorXd result =
+                  a_face.transpose() *
+                  options.sampled_iris_options.containment_points.value();
+              double relaxation = result.maxCoeff() - b_face;
+              if (relaxation > 0) {
+                b_face += relaxation;
+                if (max_relaxation < relaxation) max_relaxation = relaxation;
+              }
             }
-          }
-          A.row(current_num_faces) = a_face.transpose();
-          b(current_num_faces) = b_face;
-          ++current_num_faces;
-          ++hyperplanes_added;
+            A.row(current_num_faces) = a_face.transpose();
+            b(current_num_faces) = b_face;
+            ++current_num_faces;
 
-          // Resize A matrix if we need more faces.
-          if (A.rows() <= current_num_faces) {
-            A.conservativeResize(A.rows() * 2, A.cols());
-            b.conservativeResize(b.rows() * 2);
+            // Resize A matrix if we need more faces.
+            if (A.rows() <= current_num_faces) {
+              A.conservativeResize(A.rows() * 2, A.cols());
+              b.conservativeResize(b.rows() * 2);
+            }
+          } else {
+            internal::AddTangentToPolytope(
+                current_ellipsoid, nearest_particle,
+                options.sampled_iris_options.configuration_space_margin, &A, &b,
+                &current_num_faces);
           }
+          ++hyperplanes_added;
 
           // Fill in meshcat if added for debugging.
           if (options.sampled_iris_options.meshcat && ambient_dimension <= 3) {
@@ -589,19 +619,23 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
 
           // Loop over remaining non-redundant particles and check for
           // redundancy.
-          // TODO(cohnt): Revert this back to parallel but with CRU.
-          for (int particle_index = 0;
-               particle_index < number_particles_in_collision;
-               ++particle_index) {
-            if (!particle_is_redundant[particle_index]) {
-              if (a_face.transpose() *
-                          particles_in_collision_updated[particle_index] -
-                      b_face >=
-                  0) {
-                particle_is_redundant[particle_index] = 1;
+          const auto mark_redundant_particles = [&](const int thread_num,
+                                                    const int64_t index) {
+            unused(thread_num);
+            if (!particle_is_redundant[index]) {
+              const double margin = A.row(current_num_faces - 1) *
+                                        particles_in_collision_updated[index] -
+                                    b(current_num_faces - 1);
+              if (margin >= 0) {
+                particle_is_redundant[index] = 1;
               }
             }
-          }
+          };
+
+          DynamicParallelForIndexLoop(DegreeOfParallelism(num_threads_to_use),
+                                      0, number_particles_in_collision,
+                                      mark_redundant_particles,
+                                      ParallelForBackend::BEST_AVAILABLE);
         }
       }
 
@@ -612,13 +646,8 @@ HPolyhedron IrisZo(const planning::CollisionChecker& checker,
                         "ensure point containment",
                         max_relaxation));
       }
-      // Resampling particles in current polyhedron for next iteration.
-      particles[0] = P.UniformSample(&generator,
-                                     options.sampled_iris_options.mixing_steps);
-      for (int j = 1; j < options.sampled_iris_options.num_particles; ++j) {
-        particles[j] =
-            P.UniformSample(&generator, particles[j - 1],
-                            options.sampled_iris_options.mixing_steps);
+      if (probabilistic_test_passed) {
+        break;
       }
       ++num_iterations_separating_planes;
 

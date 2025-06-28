@@ -232,6 +232,39 @@ void DeformableBody<T>::Enable(systems::Context<T>* context) const {
 }
 
 template <typename T>
+Vector3<T> DeformableBody<T>::CalcCenterOfMassPositionInWorld(
+    const systems::Context<T>& context) const {
+  DRAKE_DEMAND(fem_model_ != nullptr);
+  const fem::FemState<T>& fem_state =
+      this->GetParentTreeSystem()
+          .get_cache_entry(fem_state_cache_index_)
+          .template Eval<fem::FemState<T>>(context);
+  return fem_model_->CalcCenterOfMassPositionInWorld(fem_state);
+}
+
+template <typename T>
+Vector3<T> DeformableBody<T>::CalcCenterOfMassTranslationalVelocityInWorld(
+    const systems::Context<T>& context) const {
+  DRAKE_DEMAND(fem_model_ != nullptr);
+  const fem::FemState<T>& fem_state =
+      this->GetParentTreeSystem()
+          .get_cache_entry(fem_state_cache_index_)
+          .template Eval<fem::FemState<T>>(context);
+  return fem_model_->CalcCenterOfMassTranslationalVelocityInWorld(fem_state);
+}
+
+template <typename T>
+Vector3<T> DeformableBody<T>::CalcEffectiveAngularVelocity(
+    const systems::Context<T>& context) const {
+  DRAKE_DEMAND(fem_model_ != nullptr);
+  const fem::FemState<T>& fem_state =
+      this->GetParentTreeSystem()
+          .get_cache_entry(fem_state_cache_index_)
+          .template Eval<fem::FemState<T>>(context);
+  return fem_model_->CalcEffectiveAngularVelocity(fem_state);
+}
+
+template <typename T>
 DeformableBody<T>::DeformableBody(
     DeformableBodyIndex index, DeformableBodyId id, std::string name,
     GeometryId geometry_id, ModelInstanceIndex model_instance,
@@ -243,6 +276,7 @@ DeformableBody<T>::DeformableBody(
       geometry_id_(geometry_id),
       mesh_G_(mesh_G),
       X_WG_(X_WG),
+      X_WD_(X_WG),
       config_(config) {
   if constexpr (std::is_same_v<T, double>) {
     geometry::VolumeMesh<double> mesh_W = mesh_G;
@@ -311,6 +345,8 @@ std::unique_ptr<DeformableBody<double>> DeformableBody<T>::CloneToDouble()
     /* mesh_G_ is copied in the constructor above. */
     /* filament_G_ is copied in the constructor above. */
     /* X_WG_ is copied in the constructor above. */
+    /* Copy over X_WD_. */
+    clone->X_WD_ = X_WD_;
     /* config_ is copied in the constructor above. */
     /* Copy over reference_positions_. */
     clone->reference_positions_ = reference_positions_;
@@ -488,8 +524,164 @@ void DeformableBody<T>::DoDeclareDiscreteState(
   }
 }
 
-}  // namespace multibody
-}  // namespace drake
+template <typename T>
+template <typename T1>
+typename std::enable_if_t<std::is_same_v<T1, double>, void>
+DeformableBody<T>::BuildFilamentDerModel(
+    const math::RigidTransform<T>& X_WG, const geometry::Filament& filament_G,
+    const fem::DeformableBodyConfig<T>& config) {
+  const Eigen::Matrix3X<T> node_pos = X_WG * filament_G.node_pos();
+  const Eigen::Matrix3X<T> edge_m1 = X_WG.rotation() * filament_G.edge_m1();
+  const int num_nodes = node_pos.cols();
+  const int num_edges = edge_m1.cols();
+  DRAKE_THROW_UNLESS(num_nodes >= 2);
+  DRAKE_THROW_UNLESS(num_edges ==
+                     (filament_G.closed() ? num_nodes : num_nodes - 1));
+  Eigen::Matrix3X<T> edge_t(3, num_edges);
+  for (int i = 0; i < num_edges; ++i) {
+    const int ip1 = (i + 1) % num_nodes;
+    edge_t.col(i) = math::internal::NormalizeOrThrow<T>(
+        node_pos.col(ip1) - node_pos.col(i), __func__);
+  }
+  Eigen::Matrix3X<T> edge_d1(3, num_edges);
+  math::SpaceParallelFrameTransport<T>(edge_t, edge_m1.col(0), &edge_d1);
+
+  typename der::DerModel<T>::Builder builder;
+  builder.AddFirstEdge(node_pos.col(0), 0.0, node_pos.col(1), edge_m1.col(0));
+  for (int i = 1; i < num_edges; ++i) {
+    const T gamma_i = math::SignedAngleAroundAxis<T>(
+        edge_d1.col(i), edge_m1.col(i), edge_t.col(i));
+    const int ip1 = (i + 1) % num_nodes;
+    builder.AddEdge(gamma_i, node_pos.col(ip1));
+  }
+
+  builder.SetUndeformedStateToInitialState();
+
+  const T E = config.youngs_modulus();
+  const T G = E / (2 * (1 + config.poissons_ratio()));
+  const T rho = config.mass_density();
+  builder.SetMaterialProperties(E, G, rho);
+  builder.SetDampingCoefficients(config.mass_damping_coefficient(),
+                                 config.stiffness_damping_coefficient());
+
+  std::visit(
+      overloaded{
+          [&builder](const geometry::Filament::CircularCrossSection& cs) {
+            builder.SetCircularCrossSection(cs.diameter / 2);
+          },
+          [&builder](const geometry::Filament::RectangularCrossSection& cs) {
+            builder.SetRectangularCrossSection(cs.width, cs.height);
+          }},
+      filament_G.cross_section());
+
+  der_model_ = builder.Build();
+}
+
+template <typename T>
+void DeformableBody<T>::DoDeclareDiscreteState(
+    internal::MultibodyTreeSystem<T>* tree_system) {
+  if (fem_model_) {
+    std::unique_ptr<fem::FemState<T>> default_fem_state =
+        fem_model_->MakeFemState();
+    const int num_dofs = default_fem_state->num_dofs();
+    VectorX<T> model_state(num_dofs * 3 /* q, v, and a */);
+    model_state.head(num_dofs) = default_fem_state->GetPositions();
+    model_state.segment(num_dofs, num_dofs) =
+        default_fem_state->GetVelocities();
+    model_state.tail(num_dofs) = default_fem_state->GetAccelerations();
+    discrete_state_index_ =
+        this->DeclareDiscreteState(tree_system, model_state);
+  } else if (der_model_) {
+    std::unique_ptr<der::internal::DerState<T>> default_der_state =
+        der_model_->CreateDerState();
+    VectorX<T> model_state = default_der_state->Serialize();
+    discrete_state_index_ =
+        this->DeclareDiscreteState(tree_system, model_state);
+  } else {
+    DRAKE_UNREACHABLE();
+  }
+}
+
+template <typename T>
+void DeformableBody<T>::DoDeclareDiscreteState(
+    internal::MultibodyTreeSystem<T>* tree_system) {
+  const int num_dofs = fem_model_->num_dofs();
+  VectorX<T> model_state = VectorX<T>::Zero(num_dofs * 3 /* q, v, and a */);
+  model_state.head(num_dofs) = CalcDefaultPositions();
+  discrete_state_index_ = this->DeclareDiscreteState(tree_system, model_state);
+}
+
+template <typename T>
+void DeformableBody<T>::SetDefaultState(const systems::Context<T>&,
+                                        systems::State<T>* state) const {
+  state->get_mutable_discrete_state(discrete_state_index_)
+      .get_mutable_value()
+      .head(fem_model_->num_dofs()) = CalcDefaultPositions();
+}
+
+template <typename T>
+VectorX<T> DeformableBody<T>::CalcDefaultPositions() const {
+  const VectorX<double>& p_WVg = reference_positions_;
+  const int num_dofs = fem_model_->num_dofs();
+  VectorX<T> p_WVd = VectorX<T>::Zero(num_dofs);
+  /* `reference_positions_` stores the list of p_WVg for all vertices V
+   in the mesh and we have p_WVg = X_WG * p_GV, where p_GV is the position
+   of vertex V in the geometry frame G.
+   Now we want the default state to store the poisitions p_WVd, the positions
+   of the vertices of the deformable body with the default pose D, which is
+   given by p_WVd = X_WD * p_DV. By noting p_DV = p_GV, we get
+   p_WVd = X_WD * p_GV = X_WD * X_WG⁻¹ * p_WVd. */
+  const math::RigidTransform<double> X_DG = X_WD_ * X_WG_.inverse();
+  for (int i = 0; i < num_dofs / 3; ++i) {
+    p_WVd.template segment<3>(3 * i) = X_DG * p_WVg.template segment<3>(3 * i);
+  }
+  return p_WVd;
+}
+
+template <typename T>
+void DeformableBody<T>::DoDeclareParameters(
+    internal::MultibodyTreeSystem<T>* tree_system) {
+  is_enabled_parameter_index_ =
+      this->DeclareAbstractParameter(tree_system, Value<bool>(true));
+}
+
+template <typename T>
+void DeformableBody<T>::DoDeclareCacheEntries(
+    internal::MultibodyTreeSystem<T>* tree_system) {
+  /* Declare cache entry for FemState. */
+  DRAKE_DEMAND(fem_model_ != nullptr);
+  std::unique_ptr<fem::FemState<T>> model_state = fem_model_->MakeFemState();
+  const auto& fem_state_cache_entry = this->DeclareCacheEntry(
+      tree_system, fmt::format("fem_state_for_body_{}", id_.get_value()),
+      systems::ValueProducer(
+          *model_state,
+          std::function<void(const systems::Context<T>&, fem::FemState<T>*)>(
+              [this](const systems::Context<T>& context,
+                     fem::FemState<T>* state) {
+                this->CalcFemStateFromDiscreteValues(context, state);
+              })),
+      {tree_system->xd_ticket()});
+  fem_state_cache_index_ = fem_state_cache_entry.cache_index();
+}
+
+template <typename T>
+void DeformableBody<T>::CalcFemStateFromDiscreteValues(
+    const systems::Context<T>& context, fem::FemState<T>* fem_state) const {
+  DRAKE_DEMAND(fem_state != nullptr);
+  const systems::BasicVector<T>& discrete_vector =
+      context.get_discrete_state().get_vector(discrete_state_index_);
+  const VectorX<T>& discrete_value = discrete_vector.value();
+  DRAKE_DEMAND(discrete_value.size() % 3 == 0);
+  const int num_dofs = discrete_value.size() / 3;
+  DRAKE_DEMAND(num_dofs == fem_model_->num_dofs());
+
+  fem_state->SetPositions(discrete_value.head(num_dofs));
+  fem_state->SetVelocities(discrete_value.segment(num_dofs, num_dofs));
+  fem_state->SetAccelerations(discrete_value.tail(num_dofs));
+}
 
 DRAKE_DEFINE_CLASS_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
     class ::drake::multibody::DeformableBody);
+
+}  // namespace multibody
+}  // namespace drake

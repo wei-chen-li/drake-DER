@@ -1,5 +1,10 @@
 #include "drake/planning/iris/iris_common.h"
 
+#include <common_robotics_utilities/parallelism.hpp>
+
+#include "drake/geometry/optimization/hpolyhedron.h"
+#include "drake/geometry/optimization/hyperellipsoid.h"
+
 namespace drake {
 namespace planning {
 
@@ -59,5 +64,75 @@ IrisParameterizationFunction::IrisParameterizationFunction(
   parameterization_dimension_ = dimension;
 }
 
+namespace internal {
+
+using common_robotics_utilities::parallelism::DegreeOfParallelism;
+using common_robotics_utilities::parallelism::ParallelForBackend;
+using common_robotics_utilities::parallelism::StaticParallelForRangeLoop;
+using common_robotics_utilities::parallelism::ThreadWorkRange;
+
+int unadaptive_test_samples(double epsilon, double delta, double tau) {
+  return static_cast<int>(-2 * std::log(delta) / (tau * tau * epsilon) + 0.5);
+}
+float calc_delta_min(double delta, int max_iterations) {
+  return delta * 6 / (M_PI * M_PI * max_iterations * max_iterations);
+}
+
+// Add the tangent to the (scaled) ellipsoid at @p point as a
+// constraint.
+void AddTangentToPolytope(
+    const geometry::optimization::Hyperellipsoid& E,
+    const Eigen::Ref<const Eigen::VectorXd>& point,
+    double configuration_space_margin,
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>* A,
+    Eigen::VectorXd* b, int* num_constraints) {
+  while (*num_constraints >= A->rows()) {
+    // Increase pre-allocated polytope size.
+    A->conservativeResize(A->rows() * 2, A->cols());
+    b->conservativeResize(b->rows() * 2);
+  }
+
+  A->row(*num_constraints) =
+      (E.A().transpose() * E.A() * (point - E.center())).normalized();
+  (*b)[*num_constraints] =
+      A->row(*num_constraints) * point - configuration_space_margin;
+  if (A->row(*num_constraints) * E.center() > (*b)[*num_constraints]) {
+    throw std::logic_error(
+        "The current center of the IRIS region is within "
+        "options.sampled_iris_options.configuration_space_margin of being "
+        "infeasible.  Check your sample point and/or any additional "
+        "constraints you've passed in via the options. The configuration space "
+        "surrounding the sample point must have an interior.");
+  }
+  *num_constraints += 1;
+}
+
+void PopulateParticlesByUniformSampling(
+    const geometry::optimization::HPolyhedron& P, int number_to_sample,
+    int mixing_steps, std::vector<RandomGenerator>* generators,
+    std::vector<Eigen::VectorXd>* particles) {
+  DRAKE_THROW_UNLESS(number_to_sample <= ssize(*particles));
+  const int num_threads = ssize(*generators);
+
+  const auto hit_and_run_sample_work =
+      [&P, &particles, &generators,
+       &mixing_steps](const ThreadWorkRange& work_range) {
+        const int64_t start_index = work_range.GetRangeStart();
+        const int64_t end_index = work_range.GetRangeEnd();
+        const int64_t thread_num = work_range.GetThreadNum();
+        RandomGenerator* generator = &(generators->at(thread_num));
+        (*particles)[start_index] = P.UniformSample(generator, mixing_steps);
+        for (int j = start_index + 1; j < end_index; ++j) {
+          (*particles)[j] =
+              P.UniformSample(generator, (*particles)[j - 1], mixing_steps);
+        }
+      };
+
+  StaticParallelForRangeLoop(DegreeOfParallelism(num_threads), 0,
+                             number_to_sample, hit_and_run_sample_work,
+                             ParallelForBackend::BEST_AVAILABLE);
+}
+
+}  // namespace internal
 }  // namespace planning
 }  // namespace drake

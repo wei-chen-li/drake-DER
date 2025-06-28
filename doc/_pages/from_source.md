@@ -13,12 +13,9 @@ to build Drake from source, which is somewhat more challenging.
 Drake's source code is available on [GitHub](https://github.com/RobotLocomotion/drake).
 
 In addition to the code on `master`, the source code archives
-are published for each release at
-`https://github.com/RobotLocomotion/drake/releases/download/drake-<version>-src.tar.gz`
+for each release are published at
+`https://github.com/RobotLocomotion/drake/releases/download/v<version>/drake-<version>-src.tar.gz`
 with corresponding .sha256 and .sha512 checksums.
-This mirrors GitHub's source code archive available at
-`https://github.com/RobotLocomotion/drake/archive/refs/tags/v<version>.tar.gz`,
-but checksums are provided for additional stability.
 
 # Supported Configurations
 
@@ -35,7 +32,7 @@ officially supports when building from source:
 | Operating System ⁽¹⁾               | Architecture | Python ⁽²⁾ | Bazel | CMake | C/C++ Compiler ⁽³⁾           | Java       |
 |------------------------------------|--------------|------------|-------|-------|------------------------------|------------|
 | Ubuntu 22.04 LTS (Jammy Jellyfish) | x86_64       | 3.10       | 8.2   | 3.22  | GCC 11 (default) or Clang 15 | OpenJDK 11 |
-| Ubuntu 24.04 LTS (Noble Numbat)    | x86_64       | 3.12       | 8.2   | 3.28  | GCC 13 (default) or Clang 15 | OpenJDK 21 |
+| Ubuntu 24.04 LTS (Noble Numbat)    | x86_64       | 3.12       | 8.2   | 3.28  | GCC 13 (default) or Clang 19 | OpenJDK 21 |
 | macOS Sonoma (14)                  | arm64        | 3.13       | 8.2   | 4.0   | Apple LLVM 16 (Xcode 16.2)   | OpenJDK 23 |
 | macOS Sequoia (15)                 | arm64        | 3.13       | 8.2   | 4.0   | Apple LLVM 17 (Xcode 16.4)   | OpenJDK 23 |
 
@@ -48,7 +45,7 @@ with other versions of Python or Java. However, these are not supported
 so if it doesn't work for you then please file a pull request with the fix,
 not a bug report.
 
-All else being equal, we would recommend developers use Ubuntu 22.04 (Jammy).
+All else being equal, we would recommend developers use Ubuntu 24.04 (Noble).
 
 ⁽¹⁾ Drake features that perform image rendering (e.g., camera simulation)
 maybe require extra setup. See the
@@ -84,7 +81,7 @@ make install
 To change the build options, you can run one of the standard CMake GUIs (e.g.,
 `ccmake` or `cmake-gui`) or specify command-line options with `-D` to `cmake`.
 
-##  Drake-specific CMake Options
+## Drake-specific CMake Options
 
 These options can be set using `-DFOO=bar` on the CMake command line, or in one
 of the CMake GUIs.
@@ -149,6 +146,10 @@ Adjusting closed-source (commercial) software dependencies:
   using a hard-coded and access-controlled download of SNOPT.
   * This option is only valid for MIT- or TRI-affiliated Drake developers.
   * This option is mutally exclusive with `WITH_SNOPT`.
+
+Important note: when compiling Drake with Clang 17 or newer on Linux, you must
+add `-fno-assume-unique-vtables` to your project's `CXXFLAGS`, or else Drake's
+use of run-time type information and dynamic casts will not work correctly.
 
 ## CMake Caveats
 
