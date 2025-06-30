@@ -1,3 +1,5 @@
+#include "drake/examples/multibody/filament/filament_common.h"
+
 #include <fstream>
 #include <sstream>
 
