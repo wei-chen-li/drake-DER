@@ -168,6 +168,7 @@ MultibodyConstraintId DeformableBody<T>::AddFixedConstraint(
       const int i = spec.nodes[k];
       const int ip1 =
           der_model_->has_closed_ends() ? (i + 1) % num_nodes : (i + 1);
+      if (i >= filament_G_->edge_m1().cols()) continue;
       /* The m₁ director in the filament body's geometry frame. */
       const Vector3<double> m1_Ai = filament_G_->edge_m1().col(i);
       if (ip1 == spec.nodes[(k + 1) % ssize(spec.nodes)]) {
@@ -183,6 +184,7 @@ MultibodyConstraintId DeformableBody<T>::AddFixedConstraint(
           "call to AddFixedConstraint() if this is intended.",
           id_, body_B.name()));
     }
+    fixed_constraint_specs2_.push_back(std::move(spec));
   } else {
     DRAKE_UNREACHABLE();
   }
