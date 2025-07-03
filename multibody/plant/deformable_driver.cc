@@ -959,13 +959,17 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
 
       const auto [fn0, stiffness, damping] = [&]() {
         if (!geometry_pair.is_patch_contact()) {
-          double default_stiffness = manager_->default_contact_stiffness();
-          if (default_stiffness == 0.0) default_stiffness = 1e5;
-          // TODO(wei-chen): Find a default stiffness from filaments.
-          const T stiffness_A =
-              GetPointContactStiffness(id_A, default_stiffness, inspector);
-          const T stiffness_B =
-              GetPointContactStiffness(id_B, default_stiffness, inspector);
+          const double default_rigid_stiffness =
+              manager_->default_contact_stiffness();
+          // TODO(wei-chen): Comment on this default filament contact stiffness.
+          const double default_filament_stiffness = 1e5;
+          const T stiffness_A = GetPointContactStiffness(
+              id_A, default_filament_stiffness, inspector);
+          const T stiffness_B = GetPointContactStiffness(
+              id_B,
+              geometry_pair.is_B_filament() ? default_filament_stiffness
+                                            : default_rigid_stiffness,
+              inspector);
           const T k =
               GetCombinedPointContactStiffness(stiffness_A, stiffness_B);
 
@@ -995,6 +999,11 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
           return std::make_tuple(fn, k, d);
         }
       }();
+      /* For stiffness < 0, that is phi0 > 0 and fn > 0. The phi0 reported by
+       hydroelastic contact badly computed, ignore it. */
+      if (stiffness < 0) {
+        continue;
+      }
 
       const double default_dissipation_time_constant = 0.1;
       const T tau = GetCombinedDissipationTimeConstant(
