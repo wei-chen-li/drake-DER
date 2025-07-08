@@ -138,6 +138,7 @@ drake_cc_library(
         ":bv",
         ":bvh",
         "//common:essential",
+        "//math:geometric_transform",
     ],
 )
 
