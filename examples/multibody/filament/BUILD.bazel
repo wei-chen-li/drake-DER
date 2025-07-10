@@ -151,7 +151,7 @@ drake_cc_binary(
     srcs = ["knot.cc"],
     add_test_rule = 1,
     test_rule_args = [
-        "-simulation_time=0.001",
+        "-pull_distance=0.01",
     ],
     deps = [
         ":filament_common",
