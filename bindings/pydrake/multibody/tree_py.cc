@@ -1185,6 +1185,8 @@ void DefineDeformableBody(py::module m) {
           py_rvp::reference_internal, cls_doc.reference_positions.doc)
       // TODO(xuchenhan-tri): Bind fem_model() or make it internal.
       // TODO(xuchenhan-tri): Bind external_forces().
+      .def("mutable_der_model", &Class::mutable_der_model,
+          py_rvp::reference_internal, cls_doc.mutable_der_model.doc)
       .def("discrete_state_index", &Class::discrete_state_index,
           cls_doc.discrete_state_index.doc)
       .def("is_enabled_parameter_index", &Class::is_enabled_parameter_index,
@@ -1229,6 +1231,7 @@ PYBIND11_MODULE(tree, m) {
 
   py::module::import("pydrake.common.eigen_geometry");
   py::module::import("pydrake.multibody.math");
+  py::module::import("pydrake.multibody.der");
   py::module::import("pydrake.multibody.fem");
   py::module::import("pydrake.systems.framework");
   py::module::import("pydrake.geometry");
