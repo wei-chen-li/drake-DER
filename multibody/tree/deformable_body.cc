@@ -164,18 +164,19 @@ MultibodyConstraintId DeformableBody<T>::AddFixedConstraint(
       }
     }
     /* If node i and node i+1 are fixed, also fix edge i. */
+    /*
     for (int k = 0; k < ssize(spec.nodes); ++k) {
       const int i = spec.nodes[k];
       const int ip1 =
           der_model_->has_closed_ends() ? (i + 1) % num_nodes : (i + 1);
       if (i >= filament_G_->edge_m1().cols()) continue;
-      /* The m₁ director in the filament body's geometry frame. */
+      // The m₁ director in the filament body's geometry frame.
       const Vector3<double> m1_Ai = filament_G_->edge_m1().col(i);
       if (ip1 == spec.nodes[(k + 1) % ssize(spec.nodes)]) {
         spec.edges.push_back(i);
         spec.m1_Bs.emplace_back(X_BA * m1_Ai);
       }
-    }
+    } */
     /* Throw if no constraints are added. */
     if (spec.nodes.size() == 0) {
       throw std::runtime_error(fmt::format(
