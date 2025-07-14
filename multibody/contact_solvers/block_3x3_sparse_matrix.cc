@@ -2,8 +2,6 @@
 
 #include <algorithm>
 
-#include "drake/multibody/contact_solvers/block_3x1_sparse_matrix.h"
-
 namespace drake {
 namespace multibody {
 namespace contact_solvers {
@@ -177,30 +175,32 @@ void Block3x3SparseMatrix<T>::TransposeAndMultiplyAndAddTo(
 
 template <class T>
 void Block3x3SparseMatrix<T>::TransposeAndMultiplyAndAddTo(
-    const Block3x1SparseMatrix<T>& A, EigenPtr<MatrixX<T>> y) const {
+    const Eigen::SparseMatrix<T, Eigen::RowMajor>& A,
+    EigenPtr<MatrixX<T>> y) const {
   DRAKE_DEMAND(y != nullptr);
   DRAKE_DEMAND(rows() == A.rows());
   DRAKE_DEMAND(y->rows() == this->cols());
   DRAKE_DEMAND(y->cols() == A.cols());
 
-  if (A.get_triplets().empty() || this->row_data_.empty()) {
+  if (A.nonZeros() == 0 || this->row_data_.empty()) {
     return;
   }
 
-  /* We are performing yᵢⱼ += ∑ₖ Mₖᵢᵀ * Aₖⱼ. For each ij block in y, we need to
-   sum over block row indices, k, where Mₖᵢ and Aₖⱼ both have non-zero blocks.
-   We do this by looping over block row indices. For each block row k, we find
-   all blocks of A and M that have k as block row index. Then we loop over their
-   block column indices (i for M and j for A), perform the dense multiplication,
-   and add to the corresponding block in y. */
-  for (int k = 0; k < block_rows_; ++k) {
-    for (const Triplet& m : row_data_[k]) {
+  /* We are performing yᵢⱼ += ∑ₖ Mₖᵢᵀ * Aₖⱼ, where Mₖᵢ ∈ ℝ¹ˣ³ and Aₖⱼ ∈ ℝ¹ˣ¹. */
+  for (int l = 0; l < block_rows_; ++l) {
+    for (const Triplet& m : row_data_[l]) {
       const int i = std::get<1>(m);  // block column index of M block
-      const Matrix3<T>& M_ki = std::get<2>(m);
-      for (const auto& a : A.get_triplets()[k]) {
-        const int j = std::get<1>(a);  // block column index of A block
-        const Vector3<T>& A_kj = std::get<2>(a);
-        y->template block<3, 1>(3 * i, j) += M_ki.transpose() * A_kj;
+      const Matrix3<T>& block_li = std::get<2>(m);
+
+      for (int k = l * 3; k < (l + 1) * 3; ++k) {
+        for (typename Eigen::SparseMatrix<T, Eigen::RowMajor>::InnerIterator it(
+                 A, k);
+             it; ++it) {
+          const int j = it.col();
+          const T A_kj = it.value();
+          const Eigen::Matrix<T, 1, 3> M_ki = block_li.row(k - l * 3);
+          y->template block<3, 1>(3 * i, j) += M_ki.transpose() * A_kj;
+        }
       }
     }
   }

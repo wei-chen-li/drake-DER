@@ -55,7 +55,6 @@ drake_cc_library(
     name = "block_3x3_sparse_matrix",
     srcs = ["block_3x3_sparse_matrix.cc"],
     hdrs = [
-        "block_3x1_sparse_matrix.h",
         "block_3x3_sparse_matrix.h",
     ],
     deps = [

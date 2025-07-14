@@ -81,11 +81,12 @@ class Block3x3SparseMatrix {
   void TransposeAndMultiplyAndAddTo(const Block3x3SparseMatrix<T>& A,
                                     EigenPtr<MatrixX<T>> y) const;
 
-  /* Performs y += Mᵀ * A, where A is 3x1 block sparse.
+  /* Performs y += Mᵀ * A, where A is an Eigen sparse matrix.
    @pre y != nullptr and the sizes of A and y are compatible with this matrix.
   */
-  void TransposeAndMultiplyAndAddTo(const Block3x1SparseMatrix<T>& A,
-                                    EigenPtr<MatrixX<T>> y) const;
+  void TransposeAndMultiplyAndAddTo(
+      const Eigen::SparseMatrix<T, Eigen::RowMajor>& A,
+      EigenPtr<MatrixX<T>> y) const;
 
   /* Performs y += M * scale.asDiagonal() * M.transpose().
    @pre y != nullptr and the sizes of scale and y are compatible with this

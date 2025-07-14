@@ -3,7 +3,6 @@
 #include <gtest/gtest.h>
 
 #include "drake/common/test_utilities/eigen_matrix_compare.h"
-#include "drake/multibody/contact_solvers/block_3x1_sparse_matrix.h"
 
 namespace drake {
 namespace multibody {
@@ -119,7 +118,7 @@ GTEST_TEST(Block3x3SparseMatrixTest, TransposeAndMultiplyAndAddTo) {
   y2 += dense_matrix.transpose() * A;
   EXPECT_TRUE(CompareMatrices(y1, y2));
 
-  /* Test multiplication with 3x3 sparse . */
+  /* Test multiplication with 3x3 sparse. */
   Block3x3SparseMatrix<double> A_3x3sparse(4, 2);
   {
     std::vector<Block3x3SparseMatrix<double>::Triplet> triplets;
@@ -131,16 +130,19 @@ GTEST_TEST(Block3x3SparseMatrixTest, TransposeAndMultiplyAndAddTo) {
   y2 += dense_matrix.transpose() * A_3x3sparse.MakeDenseMatrix();
   EXPECT_TRUE(CompareMatrices(y1, y2));
 
-  /* Test multiplication with 3x1 sparse . */
-  Block3x1SparseMatrix<double> A_3x1sparse(4, 6);
+  /* Test multiplication with Eigen sparse matrix. */
+  Eigen::SparseMatrix<double, Eigen::RowMajor> A_1x1sparse(12, 6);
   {
-    std::vector<Block3x1SparseMatrix<double>::Triplet> triplets;
-    triplets.emplace_back(0, 1, Vector3d::Constant(4.0));
-    triplets.emplace_back(2, 1, Vector3d::Constant(5.0));
-    A_3x1sparse.SetFromTriplets(triplets);
+    std::vector<Eigen::Triplet<double>> triplets;
+    triplets.emplace_back(0, 1, 4.0);
+    triplets.emplace_back(2, 2, 5.0);
+    triplets.emplace_back(4, 3, 6.0);
+    triplets.emplace_back(6, 4, 7.0);
+    triplets.emplace_back(8, 5, 8.0);
+    A_1x1sparse.setFromTriplets(triplets.begin(), triplets.end());
   }
-  sparse_matrix.TransposeAndMultiplyAndAddTo(A_3x1sparse, &y1);
-  y2 += dense_matrix.transpose() * A_3x1sparse.MakeDenseMatrix();
+  sparse_matrix.TransposeAndMultiplyAndAddTo(A_1x1sparse, &y1);
+  y2 += dense_matrix.transpose() * A_1x1sparse.toDense();
   EXPECT_TRUE(CompareMatrices(y1, y2));
 }
 
