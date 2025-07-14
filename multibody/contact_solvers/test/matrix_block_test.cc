@@ -38,6 +38,21 @@ Block3x3SparseMatrix<double> MakeBlockSparseMatrix() {
   return sparse_matrix;
 }
 
+/* Returns an arbitrary Eigen::SparseMatrix with size 12-by-9. */
+Eigen::SparseMatrix<double, Eigen::RowMajor> MakeEigenSparseMatrix() {
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse_matrix(12, 9);
+  std::vector<Eigen::Triplet<double>> triplets;
+  triplets.emplace_back(0, 0, 1.0);
+  triplets.emplace_back(2, 1, 2.0);
+  triplets.emplace_back(4, 2, 3.0);
+  triplets.emplace_back(6, 3, 4.0);
+  triplets.emplace_back(8, 4, 5.0);
+  triplets.emplace_back(10, 5, 6.0);
+  sparse_matrix.setFromTriplets(triplets.begin(), triplets.end());
+  EXPECT_EQ(sparse_matrix.nonZeros(), 6);
+  return sparse_matrix;
+}
+
 GTEST_TEST(MatrixBlockTest, Constructors) {
   Block3x3SparseMatrix<double> sparse = MakeBlockSparseMatrix();
   MatrixXd dense = sparse.MakeDenseMatrix();
@@ -56,6 +71,17 @@ GTEST_TEST(MatrixBlockTest, Constructors) {
 
   EXPECT_TRUE(CompareMatrices(sparse_block.MakeDenseMatrix(),
                               dense_block.MakeDenseMatrix()));
+
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse2 =
+      MakeEigenSparseMatrix();
+  const MatrixBlock<double> sparse_block2(std::move(sparse2));
+  EXPECT_EQ(sparse_block2.rows(), 12);
+  EXPECT_EQ(sparse_block2.cols(), 9);
+  EXPECT_EQ(sparse_block2.size(), 12 * 9);
+  EXPECT_FALSE(sparse_block2.is_dense());
+
+  EXPECT_TRUE(
+      CompareMatrices(sparse_block2.MakeDenseMatrix(), sparse2.toDense()));
 }
 
 GTEST_TEST(MatrixBlockTest, MultiplyAndAddTo) {
@@ -77,6 +103,13 @@ GTEST_TEST(MatrixBlockTest, MultiplyAndAddTo) {
 
   EXPECT_TRUE(CompareMatrices(y1, expected_y));
   EXPECT_TRUE(CompareMatrices(y2, expected_y));
+
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse_matrix2 =
+      MakeEigenSparseMatrix();
+  const MatrixBlock<double> sparse_block2(std::move(sparse_matrix2));
+  sparse_block2.MultiplyAndAddTo(x, &y1);
+  expected_y += sparse_matrix2.toDense() * x;
+  EXPECT_TRUE(CompareMatrices(y1, expected_y));
 }
 
 GTEST_TEST(MatrixBlockTest, TransposeAndMultiplyAndAddTo) {
@@ -97,6 +130,23 @@ GTEST_TEST(MatrixBlockTest, TransposeAndMultiplyAndAddTo) {
   sparse_block.TransposeAndMultiplyAndAddTo(sparse_block, &y2);
   dense_block.TransposeAndMultiplyAndAddTo(dense_block, &y3);
   dense_block.TransposeAndMultiplyAndAddTo(sparse_block, &y4);
+
+  EXPECT_TRUE(CompareMatrices(y1, expected_y));
+  EXPECT_TRUE(CompareMatrices(y2, expected_y));
+  EXPECT_TRUE(CompareMatrices(y3, expected_y));
+  EXPECT_TRUE(CompareMatrices(y4, expected_y));
+
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse_matrix2 =
+      MakeEigenSparseMatrix();
+  const MatrixXd dense_matrix2 = sparse_matrix2.toDense();
+  const MatrixBlock<double> sparse_block2(std::move(sparse_matrix2));
+  const MatrixBlock<double> dense_block2(dense_matrix2);
+
+  expected_y += dense_matrix2.transpose() * dense_matrix2;
+  sparse_block2.TransposeAndMultiplyAndAddTo(dense_block2, &y1);
+  sparse_block2.TransposeAndMultiplyAndAddTo(sparse_block2, &y2);
+  dense_block2.TransposeAndMultiplyAndAddTo(dense_block2, &y3);
+  dense_block2.TransposeAndMultiplyAndAddTo(sparse_block2, &y4);
 
   EXPECT_TRUE(CompareMatrices(y1, expected_y));
   EXPECT_TRUE(CompareMatrices(y2, expected_y));
@@ -131,6 +181,16 @@ GTEST_TEST(MatrixBlockTest, LeftMultiplyByBlockDiagonal) {
 
   EXPECT_TRUE(CompareMatrices(sparse_result.MakeDenseMatrix(), expected));
   EXPECT_TRUE(CompareMatrices(dense_result.MakeDenseMatrix(), expected));
+
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse_matrix2 =
+      MakeEigenSparseMatrix();
+  const MatrixBlock<double> sparse_block2(std::move(sparse_matrix2));
+  const MatrixBlock<double> result2 =
+      sparse_block2.LeftMultiplyByBlockDiagonal(Gs, start, end);
+
+  MatrixXd expected2 = dense_G * sparse_block2.MakeDenseMatrix();
+  EXPECT_TRUE(CompareMatrices(result2.MakeDenseMatrix(), expected2,
+                              16 * std::numeric_limits<double>::epsilon()));
 }
 
 GTEST_TEST(MatrixBlockTest, LeftMultiplyByBlockDiagonalWithNon3x3GBlocks) {
@@ -169,6 +229,16 @@ GTEST_TEST(MatrixBlockTest, LeftMultiplyByBlockDiagonalWithNon3x3GBlocks) {
   MatrixXd expected = dense_G * sparse_block.MakeDenseMatrix();
   EXPECT_TRUE(CompareMatrices(result.MakeDenseMatrix(), expected,
                               16 * std::numeric_limits<double>::epsilon()));
+
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse_matrix2 =
+      MakeEigenSparseMatrix();
+  const MatrixBlock<double> sparse_block2(std::move(sparse_matrix2));
+  const MatrixBlock<double> result2 =
+      sparse_block2.LeftMultiplyByBlockDiagonal(Gs, start, end);
+
+  MatrixXd expected2 = dense_G * sparse_block2.MakeDenseMatrix();
+  EXPECT_TRUE(CompareMatrices(result2.MakeDenseMatrix(), expected2,
+                              16 * std::numeric_limits<double>::epsilon()));
 }
 
 GTEST_TEST(MatrixBlockTest, MultiplyWithScaledTransposeAndAddTo) {
@@ -188,21 +258,22 @@ GTEST_TEST(MatrixBlockTest, MultiplyWithScaledTransposeAndAddTo) {
   expected += dense_matrix * scale.asDiagonal() * dense_matrix.transpose();
   EXPECT_TRUE(CompareMatrices(y1, expected));
   EXPECT_TRUE(CompareMatrices(y2, expected));
+
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse_matrix2 =
+      MakeEigenSparseMatrix();
+  const MatrixBlock<double> sparse_block2(std::move(sparse_matrix2));
+  sparse_block2.MultiplyWithScaledTransposeAndAddTo(scale, &y1);
+  expected += sparse_matrix2.toDense() * scale.asDiagonal() *
+              sparse_matrix2.toDense().transpose();
+  EXPECT_TRUE(CompareMatrices(y1, expected));
 }
 
 GTEST_TEST(MatrixBlockTest, AddMatrixBlocks) {
   Block3x3SparseMatrix<double> sparse_matrix1 = MakeBlockSparseMatrix();
   const MatrixBlock<double> sparse_block1(std::move(sparse_matrix1));
 
-  Block3x1SparseMatrix<double> sparse_matrix2(4, 9);
-  {
-    std::vector<Block3x1SparseMatrix<double>::Triplet> triplets;
-    triplets.emplace_back(0, 0, Vector3d::Constant(4.0));
-    triplets.emplace_back(1, 1, Vector3d::Constant(5.0));
-    triplets.emplace_back(2, 2, Vector3d::Constant(6.0));
-    triplets.emplace_back(3, 3, Vector3d::Constant(7.0));
-    sparse_matrix2.SetFromTriplets(triplets);
-  }
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse_matrix2 =
+      MakeEigenSparseMatrix();
   const MatrixBlock<double> sparse_block2(std::move(sparse_matrix2));
 
   const MatrixBlock<double> sum = sparse_block1 + sparse_block2;
@@ -246,14 +317,8 @@ GTEST_TEST(MatrixBlockTest, StackMatrixBlock) {
   }
 
   /* Make a third MatrixBlock that's different from the existing ones. */
-  Block3x1SparseMatrix<double> sparse_matrix3(2, 9);
-  {
-    std::vector<Block3x1SparseMatrix<double>::Triplet> triplets;
-    triplets.emplace_back(0, 7, Vector3d::Constant(6.0));
-    triplets.emplace_back(1, 8, Vector3d::Constant(7.0));
-    sparse_matrix3.SetFromTriplets(triplets);
-  }
-  const MatrixXd dense_matrix3 = sparse_matrix3.MakeDenseMatrix();
+  Eigen::SparseMatrix<double, Eigen::RowMajor> sparse_matrix3 =
+      MakeEigenSparseMatrix();
   const MatrixBlock<double> sparse_block3(std::move(sparse_matrix3));
   {
     std::vector<MatrixBlock<double>> sparse_blocks = {
