@@ -8,7 +8,6 @@
 namespace drake {
 namespace multibody {
 namespace der {
-namespace internal {
 namespace {
 
 class DerUndeformedStateTest : public ::testing::TestWithParam<bool> {};
@@ -135,7 +134,6 @@ TEST_P(DerUndeformedStateTest, set_twist) {
 }
 
 }  // namespace
-}  // namespace internal
 }  // namespace der
 }  // namespace multibody
 }  // namespace drake

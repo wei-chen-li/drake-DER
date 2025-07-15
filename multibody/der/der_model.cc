@@ -76,9 +76,8 @@ void DerModel<T>::Builder::SetZeroUndeformedCurvatureAndTwist() {
     const int ip1 = (i + 1) % num_nodes;
     edge_length[i] = (node_positions_[ip1] - node_positions_[i]).norm();
   }
-  der_undeformed_state_ =
-      internal::DerUndeformedState<T>::ZeroCurvatureAndTwist(has_closed_ends_,
-                                                             edge_length);
+  der_undeformed_state_ = DerUndeformedState<T>::ZeroCurvatureAndTwist(
+      has_closed_ends_, edge_length);
 }
 
 template <typename T>
@@ -92,8 +91,7 @@ void DerModel<T>::Builder::SetUndeformedStateToInitialState() {
       has_closed_ends_, node_positions_, edge_angles_, d1_0_);
   internal::DerState<T> der_state(&der_state_system);
 
-  der_undeformed_state_ =
-      internal::DerUndeformedState<T>::FromCurrentDerState(der_state);
+  der_undeformed_state_ = DerUndeformedState<T>::FromCurrentDerState(der_state);
 }
 
 template <typename T>
@@ -195,7 +193,7 @@ template <typename T>
 DerModel<T>::DerModel(
     std::unique_ptr<const internal::DerStateSystem<T>> der_state_system,
     internal::DerStructuralProperty<T> der_structural_property,
-    internal::DerUndeformedState<T> der_undeformed_state,
+    DerUndeformedState<T> der_undeformed_state,
     internal::DampingModel<T> damping_model,
     internal::DirichletBoundaryCondition<T> boundary_condition)
     : der_state_system_(std::move(der_state_system)),

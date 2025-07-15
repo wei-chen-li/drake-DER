@@ -183,7 +183,7 @@ class DerModel {
 
     std::optional<std::tuple<T, T, T>> material_property_;
     std::optional<std::pair<CrossSectionType, std::vector<T>>> cross_section_;
-    std::optional<internal::DerUndeformedState<T>> der_undeformed_state_;
+    std::optional<DerUndeformedState<T>> der_undeformed_state_;
     std::optional<internal::DampingModel<T>> damping_model_;
     internal::DirichletBoundaryCondition<T> boundary_condition_;
   };  // class Builder
@@ -305,7 +305,7 @@ class DerModel {
     return der_structural_property_;
   }
 
-  internal::DerUndeformedState<T>& mutable_undeformed_state() {
+  DerUndeformedState<T>& mutable_undeformed_state() {
     return der_undeformed_state_;
   }
 
@@ -313,7 +313,7 @@ class DerModel {
   void ValidateDerState(const internal::DerState<T>& state) const;
 
  private:
-  /* All DerModel of different template type can see other's private fields. */
+  /* Share private fields among DerModel, used by ToScalarType(). */
   template <typename U>
   friend class DerModel;
 
@@ -323,7 +323,7 @@ class DerModel {
   /* Private constructor. */
   DerModel(std::unique_ptr<const internal::DerStateSystem<T>> der_state_system,
            internal::DerStructuralProperty<T> der_structural_property,
-           internal::DerUndeformedState<T> der_undeformed_state,
+           DerUndeformedState<T> der_undeformed_state,
            internal::DampingModel<T> damping_model,
            internal::DirichletBoundaryCondition<T> boundary_condition);
 
@@ -332,7 +332,7 @@ class DerModel {
 
   const std::unique_ptr<const internal::DerStateSystem<T>> der_state_system_;
   const internal::DerStructuralProperty<T> der_structural_property_;
-  internal::DerUndeformedState<T> der_undeformed_state_;
+  DerUndeformedState<T> der_undeformed_state_;
   const internal::DampingModel<T> damping_model_;
   internal::DirichletBoundaryCondition<T> boundary_condition_;
   double contact_energy_scaling_{0.0};

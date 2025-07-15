@@ -4,8 +4,6 @@ namespace drake {
 namespace multibody {
 namespace der {
 
-namespace internal {
-
 template <typename T>
 DerUndeformedState<T>& DerUndeformedState<T>::operator=(
     const DerUndeformedState<T>& other) {
@@ -38,7 +36,7 @@ DerUndeformedState<T> DerUndeformedState<T>::ZeroCurvatureAndTwist(
 
 template <typename T>
 DerUndeformedState<T> DerUndeformedState<T>::FromCurrentDerState(
-    const DerState<T>& state) {
+    const internal::DerState<T>& state) {
   return DerUndeformedState<T>(state.has_closed_ends(), state.get_edge_length(),
                                state.get_curvature_kappa1(),
                                state.get_curvature_kappa2(), state.get_twist());
@@ -124,10 +122,9 @@ DerUndeformedState<Expression>::ToScalarType<double>() const;
 template DerUndeformedState<AutoDiffXd>
 DerUndeformedState<Expression>::ToScalarType<AutoDiffXd>() const;
 
-}  // namespace internal
 }  // namespace der
 }  // namespace multibody
 }  // namespace drake
 
 DRAKE_DEFINE_CLASS_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
-    class ::drake::multibody::der::internal::DerUndeformedState);
+    class ::drake::multibody::der::DerUndeformedState);

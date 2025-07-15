@@ -25,7 +25,7 @@ class DerModelTester {
   }
 
   template <typename T>
-  static const internal::DerUndeformedState<T>& get_der_undeformed_state(
+  static const DerUndeformedState<T>& get_der_undeformed_state(
       const DerModel<T>& der_model) {
     return der_model.der_undeformed_state_;
   }
@@ -151,7 +151,7 @@ class DerModelBuilderTest
   }
 
   void CheckUndeformedState() {
-    const internal::DerUndeformedState<double>& undeformed =
+    const DerUndeformedState<double>& undeformed =
         DerModelTester::get_der_undeformed_state(*model_);
     std::unique_ptr<internal::DerState<double>> state =
         model_->CreateDerState();
