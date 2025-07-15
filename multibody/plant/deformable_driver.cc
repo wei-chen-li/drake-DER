@@ -29,7 +29,6 @@ using drake::geometry::internal::DeformableContact;
 using drake::geometry::internal::DeformableContactSurface;
 using drake::geometry::internal::FilamentContact;
 using drake::geometry::internal::FilamentContactGeometryPair;
-using drake::multibody::contact_solvers::internal::Block3x1SparseMatrix;
 using drake::multibody::contact_solvers::internal::Block3x3SparseMatrix;
 using drake::multibody::contact_solvers::internal::ContactConfiguration;
 using drake::multibody::contact_solvers::internal::ContactSolverResults;
@@ -482,6 +481,20 @@ DeformableDriver<T>::ComputeContactDataForRigid(
   return result;
 }
 
+template <typename Derived>
+static void InsertBlock(
+    std::vector<Eigen::Triplet<typename Derived::Scalar>>* triplets, int i,
+    int j, const Eigen::MatrixBase<Derived>& block) {
+  DRAKE_THROW_UNLESS(triplets != nullptr);
+  DRAKE_THROW_UNLESS(i >= 0);
+  DRAKE_THROW_UNLESS(j >= 0);
+  for (int u = 0; u < block.rows(); ++u) {
+    for (int v = 0; v < block.cols(); ++v) {
+      triplets->emplace_back(i + u, j + v, block(u, v));
+    }
+  }
+}
+
 template <typename T>
 typename DeformableDriver<T>::ContactData
 DeformableDriver<T>::ComputeContactDataForFilament(
@@ -513,19 +526,18 @@ DeformableDriver<T>::ComputeContactDataForFilament(
   result.v_WGc.reserve(geometry_pair.num_contact_points());
   result.jacobian.reserve(geometry_pair.num_contact_points());
 
-  /* The Jacobian block triplets to be filled in. There are at most 7 nonzero
-   blocks. */
-  std::vector<typename Block3x1SparseMatrix<T>::Triplet> triplets;
-  triplets.reserve(7);
+  /* The Jacobian block triplets to be filled in. There are at most 3×7 nonzero
+   entries. */
+  std::vector<Eigen::Triplet<T>> triplets;
+  triplets.reserve(21);
   for (int k = 0; k < geometry_pair.num_contact_points(); ++k) {
     /* The contact Jacobian (w.r.t. v) of the velocity of the point affixed to
      the geometry that coincides with the contact point C in the world frame,
      expressed in the contact frame C. We scale it by -1 if the body corresponds
      to body A in contact to get the correct sign. */
     const double scale = is_A ? -1.0 : 1.0;
-    Block3x1SparseMatrix<T> scaled_Jv_v_WGc_C(
-        /* block rows */ 1,
-        /* block columns */ dof_permutation.permuted_domain_size());
+    Eigen::SparseMatrix<T, Eigen::RowMajor> scaled_Jv_v_WGc_C(
+        3, dof_permutation.permuted_domain_size());
     triplets.clear();
     Vector3<T> v_WGc = Vector3<T>::Zero();
 
@@ -555,22 +567,19 @@ DeformableDriver<T>::ComputeContactDataForFilament(
     if (!der_model.IsPositionFixed(index0)) {
       v_WGc += w0 * body_participating_v0.template segment<3>(permuted_dof0);
       const Matrix3<T> block = scale * w0 * R_CW.matrix();
-      triplets.emplace_back(0, permuted_dof0 + 0, block.col(0));
-      triplets.emplace_back(0, permuted_dof0 + 1, block.col(1));
-      triplets.emplace_back(0, permuted_dof0 + 2, block.col(2));
+      InsertBlock(&triplets, 0, permuted_dof0, block);
     }
     if (!der_model.IsPositionFixed(index1)) {
       v_WGc += w1 * body_participating_v0[permuted_dof1];
-      triplets.emplace_back(0, permuted_dof1, scale * (R_CW * w1));
+      const Vector3<T> block = scale * (R_CW * w1);
+      InsertBlock(&triplets, 0, permuted_dof1, block);
     }
     if (!der_model.IsPositionFixed(index2)) {
       v_WGc += w2 * body_participating_v0.template segment<3>(permuted_dof2);
       const Matrix3<T> block = scale * w2 * R_CW.matrix();
-      triplets.emplace_back(0, permuted_dof2 + 0, block.col(0));
-      triplets.emplace_back(0, permuted_dof2 + 1, block.col(1));
-      triplets.emplace_back(0, permuted_dof2 + 2, block.col(2));
+      InsertBlock(&triplets, 0, permuted_dof2, block);
     }
-    scaled_Jv_v_WGc_C.SetFromTriplets(std::move(triplets));
+    scaled_Jv_v_WGc_C.setFromTriplets(triplets.begin(), triplets.end());
 
     result.v_WGc.emplace_back(v_WGc);
     const TreeIndex tree_index(
@@ -1202,13 +1211,16 @@ void DeformableDriver<T>::AppendFilamentRigidFixedConstraintKinematics(
         EvalDofPermutation(context, index);
     const DerState<T>& der_state = EvalDerState(context, index);
 
+    std::vector<Eigen::Triplet<T>> triplets;
     for (const FilamentRigidFixedConstraintSpec& spec :
          body.fixed_constraint_specs2()) {
       const int num_constraints = ssize(spec.nodes) * 3 + ssize(spec.edges);
+      triplets.reserve(num_constraints);
       const int offset = ssize(spec.nodes) * 3;
       /* The Jacobian block for the deformable body A. */
-      MatrixX<T> negative_Jv_v_WAp = MatrixX<T>::Zero(
+      Eigen::SparseMatrix<T, Eigen::RowMajor> negative_Jv_v_WAp(
           num_constraints, dof_permutation.permuted_domain_size());
+      triplets.clear();
       /* Positions of fixed dofs of the deformable body in the deformable
        body's frame which is always assumed to be the world frame. */
       VectorX<T> q_WPs(num_constraints);
@@ -1221,8 +1233,9 @@ void DeformableDriver<T>::AppendFilamentRigidFixedConstraintKinematics(
           const int dof_index = 4 * spec.nodes[i];
           const int permuted_dof_index =
               dof_permutation.permuted_index(dof_index);
-          negative_Jv_v_WAp.template block<3, 3>(3 * i, permuted_dof_index) =
-              -Matrix3<T>::Identity();
+          triplets.emplace_back(3 * i + 0, permuted_dof_index + 0, -1.0);
+          triplets.emplace_back(3 * i + 1, permuted_dof_index + 1, -1.0);
+          triplets.emplace_back(3 * i + 2, permuted_dof_index + 2, -1.0);
         }
       }
       for (int i = 0; i < ssize(spec.edges); ++i) {
@@ -1233,9 +1246,10 @@ void DeformableDriver<T>::AppendFilamentRigidFixedConstraintKinematics(
           const int dof_index = 4 * spec.edges[i] + 3;
           const int permuted_dof_index =
               dof_permutation.permuted_index(dof_index);
-          negative_Jv_v_WAp(offset + i, permuted_dof_index) = -1.0;
+          triplets.emplace_back(offset + i, permuted_dof_index, -1.0);
         }
       }
+      negative_Jv_v_WAp.setFromTriplets(triplets.begin(), triplets.end());
       MatrixBlock<T> jacobian_block_A(std::move(negative_Jv_v_WAp));
 
       const BodyIndex index_B = spec.body_B;
