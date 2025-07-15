@@ -7,6 +7,19 @@ namespace der {
 namespace internal {
 
 template <typename T>
+DerUndeformedState<T>& DerUndeformedState<T>::operator=(
+    const DerUndeformedState<T>& other) {
+  DRAKE_THROW_UNLESS(this->has_closed_ends() == other.has_closed_ends());
+  DRAKE_THROW_UNLESS(this->num_nodes() == other.num_nodes());
+  this->edge_length_ = other.edge_length_;
+  this->voronoi_length_ = other.voronoi_length_;
+  this->kappa1_ = other.kappa1_;
+  this->kappa2_ = other.kappa2_;
+  this->twist_ = other.twist_;
+  return *this;
+}
+
+template <typename T>
 DerUndeformedState<T> DerUndeformedState<T>::ZeroCurvatureAndTwist(
     bool has_closed_ends,
     const Eigen::Ref<const Eigen::RowVectorX<T>>& edge_length) {

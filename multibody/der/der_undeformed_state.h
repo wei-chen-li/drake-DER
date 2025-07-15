@@ -21,7 +21,14 @@ namespace internal {
 template <typename T>
 class DerUndeformedState {
  public:
-  DRAKE_DEFAULT_COPY_AND_MOVE_AND_ASSIGN(DerUndeformedState);
+  DerUndeformedState(const DerUndeformedState<T>&) = default;
+  DerUndeformedState(DerUndeformedState<T>&&) = default;
+
+  DerUndeformedState<T>& operator=(DerUndeformedState<T>&&) = delete;
+
+  /* Copy assigns `other` into `this`.
+   @pre `this` and `other` are compatible. */
+  DerUndeformedState<T>& operator=(const DerUndeformedState<T>& other);
 
   /* Creates an undeformed state with the specified edge lengths, zero
    curvature, and zero twist.

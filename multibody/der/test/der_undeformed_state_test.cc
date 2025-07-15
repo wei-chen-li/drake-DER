@@ -16,6 +16,28 @@ class DerUndeformedStateTest : public ::testing::TestWithParam<bool> {};
 INSTANTIATE_TEST_SUITE_P(HasClosedEnds, DerUndeformedStateTest,
                          ::testing::Values(false, true));
 
+TEST_P(DerUndeformedStateTest, CopyAssignmentOperator) {
+  const bool has_closed_ends = GetParam();
+
+  Eigen::RowVectorXd edge_length(3);
+  edge_length << 0.10, 0.12, 0.08;
+  const auto a = DerUndeformedState<double>::ZeroCurvatureAndTwist(
+      has_closed_ends, Eigen::RowVectorXd::Ones(3));
+
+  auto b = DerUndeformedState<double>::ZeroCurvatureAndTwist(
+      has_closed_ends, Eigen::RowVectorXd::Ones(3));
+  EXPECT_NO_THROW(b = a);
+  EXPECT_EQ(b.get_edge_length(), a.get_edge_length());
+  EXPECT_EQ(b.get_voronoi_length(), a.get_voronoi_length());
+  EXPECT_EQ(b.get_curvature_kappa1(), a.get_curvature_kappa1());
+  EXPECT_EQ(b.get_curvature_kappa2(), a.get_curvature_kappa2());
+  EXPECT_EQ(b.get_twist(), a.get_twist());
+
+  auto c = DerUndeformedState<double>::ZeroCurvatureAndTwist(
+      has_closed_ends, Eigen::RowVectorXd::Ones(2));
+  EXPECT_ANY_THROW(c = a);
+}
+
 TEST_P(DerUndeformedStateTest, ZeroCurvatureAndTwist) {
   const bool has_closed_ends = GetParam();
 
