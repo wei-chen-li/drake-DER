@@ -915,11 +915,34 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
             ? body_index_B + manager_->plant().num_bodies()  // Deformable body.
             : body_index_B;                                  // Rigid body.
 
+    /* Find the fixed constraints between filament body A and rigid body B. */
+    std::unordered_set<int> fixed_nodes;
+    if (!geometry_pair.is_B_filament()) {
+      for (const FilamentRigidFixedConstraintSpec& spec :
+           deformable_model_->GetBody(body_id_A).fixed_constraint_specs2()) {
+        if (spec.body_B != body_index_B) continue;
+        for (int node : spec.nodes) fixed_nodes.insert(node);
+      }
+    }
+    const int num_nodes =
+        deformable_model_->GetDerModel(body_id_A)->num_nodes();
+
     /* We reuse `jacobian_blocks` for the Jacobian blocks for each contact point
      and clear the vector repeatedly in the loop over the contact points. */
     std::vector<typename DiscreteContactPair<T>::JacobianTreeBlock>
         jacobian_blocks;
     for (int i = 0; i < geometry_pair.num_contact_points(); ++i) {
+      /* If there is a fixed constraint between an edge in filament A and rigid
+       body B, ignore this contact point. */
+      if (!geometry_pair.is_B_filament()) {
+        const int edge_index = geometry_pair.contact_edge_indexes_A()[i];
+        const std::pair<int, int> node_indexes =
+            std::make_pair(edge_index, (edge_index + 1) % num_nodes);
+        if (fixed_nodes.contains(node_indexes.first) ||
+            fixed_nodes.contains(node_indexes.second))
+          continue;
+      }
+
       jacobian_blocks.clear();
       const Vector3<T>& v_WAc = contact_data_A.v_WGc[i];
       jacobian_blocks.push_back(std::move(contact_data_A.jacobian[i]));
