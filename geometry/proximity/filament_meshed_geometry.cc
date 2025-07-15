@@ -6,11 +6,9 @@
 #include "drake/geometry/proximity/bvh_updater.h"
 #include "drake/geometry/proximity/meshing_utilities.h"
 #include "drake/geometry/proximity/volume_mesh.h"
-#include "drake/math/axis_angle.h"
 #include "drake/math/frame_transport.h"
 #include "drake/math/rigid_transform.h"
 #include "drake/math/rotation_matrix.h"
-#include "drake/math/unit_vector.h"
 
 namespace drake {
 namespace geometry {
@@ -209,17 +207,18 @@ Vector3d LinearInterpolate(const Eigen::Ref<const Vector3d>& vec_0,
 Vector3d SphericalInterpolate(const Eigen::Ref<const Vector3d>& vec_0,
                               const Eigen::Ref<const Vector3d>& vec_1,
                               double alpha) {
+  DRAKE_ASSERT(std::abs(vec_0.norm() - 1) <= 1e-14);
+  DRAKE_ASSERT(std::abs(vec_1.norm() - 1) <= 1e-14);
   DRAKE_THROW_UNLESS(0 <= alpha && alpha <= 1);
-  Vector3d axis = vec_0.cross(vec_1);
-  const double axis_norm = axis.norm();
-  if (axis_norm < 1e-14)
+  const double cos_theta = vec_0.dot(vec_1);
+  DRAKE_THROW_UNLESS(cos_theta != -1.0);
+  if (cos_theta >= 0.9995) {
     return LinearInterpolate(vec_0, vec_1, alpha).normalized();
-  axis /= axis_norm;
-  axis -= axis.dot(vec_0) * vec_0;
-  axis -= axis.dot(vec_1) * vec_1;
-  axis.normalize();
-  const double angle = math::SignedAngleAroundAxis<double>(vec_0, vec_1, axis);
-  return math::RotateAxisAngle<double>(vec_0, axis, alpha * angle);
+  }
+  const double theta = acos(cos_theta);
+  const double sin_theta = sin(theta);
+  return sin((1 - alpha) * theta) / sin_theta * vec_0 +
+         sin(alpha * theta) / sin_theta * vec_1;
 }
 
 /* Appends the columns of `new_vertices` into `mesh_vertices`. */
