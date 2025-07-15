@@ -1,5 +1,6 @@
 #include "drake/geometry/query_results/filament_contact.h"
 
+#include <algorithm>
 #include <limits>
 
 namespace drake {
@@ -62,6 +63,20 @@ std::tuple<T, T> ComputePressureAndSignedDistance(const ContactSurface<T>& s,
   return {p0, phi0};
 }
 
+/* Removes the elements in `vector` corresponding to the indices in
+ `remove_indices`. */
+template <typename T>
+void RemoveElements(std::vector<T>* vector,
+                    const std::vector<int>& remove_indices) {
+  DRAKE_THROW_UNLESS(vector != nullptr);
+  if (remove_indices.empty()) return;
+  DRAKE_ASSERT(std::is_sorted(remove_indices.begin(), remove_indices.end()));
+  for (auto it = remove_indices.rbegin(); it != remove_indices.rend(); ++it) {
+    const int remove_index = *it;
+    vector->erase(vector->begin() + remove_index);
+  }
+}
+
 }  // namespace
 
 template <typename T>
@@ -103,11 +118,32 @@ FilamentContactGeometryPair<T>::FilamentContactGeometryPair(
     DRAKE_THROW_UNLESS(surface_meshes_.has_value());
   }
 
+  std::vector<int> remove_indices;
   R_WCs_.reserve(num_contact_points());
   for (int i = 0; i < num_contact_points(); ++i) {
     constexpr int kZAxis = 2;
-    R_WCs_.emplace_back(math::RotationMatrix<T>::MakeFromOneUnitVector(
-        -nhats_BA_W_[i], kZAxis));
+    if (!nhats_BA_W_[i].isZero()) {
+      R_WCs_.emplace_back(math::RotationMatrix<T>::MakeFromOneUnitVector(
+          -nhats_BA_W_[i], kZAxis));
+    } else {
+      /* If two geometries are touching exactly on the surface,
+       flexible-collision-library may register a collision but give a zero
+       normal vector. We remove such contacts. */
+      R_WCs_.emplace_back(math::RotationMatrix<T>());
+      remove_indices.push_back(i);
+    }
+  }
+  RemoveElements(&p_WCs_, remove_indices);
+  RemoveElements(&nhats_BA_W_, remove_indices);
+  RemoveElements(&signed_distances_, remove_indices);
+  RemoveElements(&contact_edge_indexes_A_, remove_indices);
+  RemoveElements(&kinematic_weights_A_, remove_indices);
+  RemoveElements(&contact_edge_indexes_B_.value(), remove_indices);
+  RemoveElements(&kinematic_weights_B_.value(), remove_indices);
+  RemoveElements(&R_WCs_, remove_indices);
+  if (is_patch_contact()) {
+    RemoveElements(&areas_.value(), remove_indices);
+    RemoveElements(&pressures_.value(), remove_indices);
   }
 }
 
@@ -143,11 +179,30 @@ FilamentContactGeometryPair<T>::FilamentContactGeometryPair(
     DRAKE_THROW_UNLESS(surface_meshes_.has_value());
   }
 
+  std::vector<int> remove_indices;
   R_WCs_.reserve(num_contact_points());
   for (int i = 0; i < num_contact_points(); ++i) {
     constexpr int kZAxis = 2;
-    R_WCs_.emplace_back(math::RotationMatrix<T>::MakeFromOneUnitVector(
-        -nhats_BA_W_[i], kZAxis));
+    if (!nhats_BA_W_[i].isZero()) {
+      R_WCs_.emplace_back(math::RotationMatrix<T>::MakeFromOneUnitVector(
+          -nhats_BA_W_[i], kZAxis));
+    } else {
+      /* If two geometries are touching exactly on the surface,
+       flexible-collision-library may register a collision but give a zero
+       normal vector. We remove such contacts. */
+      R_WCs_.emplace_back(math::RotationMatrix<T>());
+      remove_indices.push_back(i);
+    }
+  }
+  RemoveElements(&p_WCs_, remove_indices);
+  RemoveElements(&nhats_BA_W_, remove_indices);
+  RemoveElements(&signed_distances_, remove_indices);
+  RemoveElements(&contact_edge_indexes_A_, remove_indices);
+  RemoveElements(&kinematic_weights_A_, remove_indices);
+  RemoveElements(&R_WCs_, remove_indices);
+  if (is_patch_contact()) {
+    RemoveElements(&areas_.value(), remove_indices);
+    RemoveElements(&pressures_.value(), remove_indices);
   }
 }
 
@@ -175,6 +230,9 @@ void FilamentContact<T>::AddFilamentFilamentContactGeometryPair(
       std::move(signed_distances), std::move(contact_edge_indexes_A),
       std::move(kinematic_weights_A), std::move(contact_edge_indexes_B),
       std::move(kinematic_weights_B));
+  if (contact_geometry_pairs_.back().num_contact_points() == 0) {
+    contact_geometry_pairs_.pop_back();
+  }
 }
 
 template <typename T>
@@ -192,6 +250,9 @@ void FilamentContact<T>::AddFilamentRigidContactGeometryPair(
       id_A, id_B, std::move(p_WCs), std::move(nhats_BA_W),
       std::move(signed_distances), std::move(contact_edge_indexes_A),
       std::move(kinematic_weights_A));
+  if (contact_geometry_pairs_.back().num_contact_points() == 0) {
+    contact_geometry_pairs_.pop_back();
+  }
 }
 
 template <typename T>
@@ -264,6 +325,9 @@ void FilamentContact<T>::AddFilamentFilamentContactGeometryPair(
       std::move(kinematic_weights_A), std::move(contact_edge_indexes_B),
       std::move(kinematic_weights_B), std::move(areas), std::move(pressures),
       std::move(surface_meshes));
+  if (contact_geometry_pairs_.back().num_contact_points() == 0) {
+    contact_geometry_pairs_.pop_back();
+  }
 }
 
 template <typename T>
@@ -325,6 +389,9 @@ void FilamentContact<T>::AddFilamentRigidContactGeometryPair(
       std::move(signed_distances), std::move(contact_edge_indexes_A),
       std::move(kinematic_weights_A), std::move(areas), std::move(pressures),
       std::move(surface_meshes));
+  if (contact_geometry_pairs_.back().num_contact_points() == 0) {
+    contact_geometry_pairs_.pop_back();
+  }
 }
 
 template <typename T>

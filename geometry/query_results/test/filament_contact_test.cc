@@ -251,6 +251,74 @@ TEST_F(FilamentPatchContactTest, AddFilamentRigidContactGeometryPair) {
   }
 }
 
+GTEST_TEST(FilamentContactTest, RemoveZeroNormals) {
+  const GeometryId id_A = GeometryId::get_new_id();
+  const GeometryId id_B = GeometryId::get_new_id();
+  std::vector<Vector3d> p_WCs = {Vector3d(0.0, 0.0, 0.0)};
+  std::vector<Vector3d> nhats_BA_W = {Vector3d::Zero()};
+  std::vector<double> signed_distances = {-1e-3};
+  std::vector<int> contact_edge_indexes_A = {0};
+  std::vector<int> contact_edge_indexes_B = {0};
+  Eigen::Matrix3Xd node_positions_A(3, 2);
+  node_positions_A.col(0) = Vector3d(-1.0, 0.0, -0.01);
+  node_positions_A.col(1) = Vector3d(+1.0, 0.0, -0.01);
+  Eigen::Matrix3Xd node_positions_B(3, 2);
+  node_positions_B.col(0) = Vector3d(0.0, -1.0, 0.01);
+  node_positions_B.col(1) = Vector3d(0.0, +1.0, 0.01);
+
+  /* Because the normal is zero, the filament_contact should remain empty. */
+  FilamentContact<double> filament_contact;
+  filament_contact.AddFilamentFilamentContactGeometryPair(
+      id_A, id_B, p_WCs, nhats_BA_W, signed_distances, contact_edge_indexes_A,
+      contact_edge_indexes_B, node_positions_A, node_positions_B);
+  EXPECT_TRUE(filament_contact.contact_geometry_pairs().empty());
+  filament_contact.AddFilamentRigidContactGeometryPair(
+      id_A, id_B, p_WCs, nhats_BA_W, signed_distances, contact_edge_indexes_A,
+      node_positions_A);
+  EXPECT_TRUE(filament_contact.contact_geometry_pairs().empty());
+
+  /* Add a contact point with nonzero normal vector. */
+  p_WCs.push_back(Vector3d(0.0, 0.0, 0.0));
+  nhats_BA_W.push_back(Vector3d(0.0, 0.0, -1.0));
+  signed_distances.push_back(-1e-3);
+  contact_edge_indexes_A.push_back(0);
+  contact_edge_indexes_B.push_back(0);
+
+  filament_contact.AddFilamentFilamentContactGeometryPair(
+      id_A, id_B, p_WCs, nhats_BA_W, signed_distances, contact_edge_indexes_A,
+      contact_edge_indexes_B, node_positions_A, node_positions_B);
+  ASSERT_EQ(filament_contact.contact_geometry_pairs().size(), 1);
+  {
+    const FilamentContactGeometryPair<double>& pair =
+        filament_contact.contact_geometry_pairs()[0];
+    EXPECT_EQ(pair.num_contact_points(), 1);
+    EXPECT_EQ(pair.p_WCs().size(), 1);
+    EXPECT_EQ(pair.nhats_BA_W().size(), 1);
+    EXPECT_EQ(pair.R_WCs().size(), 1);
+    EXPECT_EQ(pair.signed_distances().size(), 1);
+    EXPECT_EQ(pair.contact_edge_indexes_A().size(), 1);
+    EXPECT_EQ(pair.kinematic_weights_A().size(), 1);
+    EXPECT_EQ(pair.contact_edge_indexes_B().size(), 1);
+    EXPECT_EQ(pair.kinematic_weights_B().size(), 1);
+  }
+
+  filament_contact.AddFilamentRigidContactGeometryPair(
+      id_A, id_B, p_WCs, nhats_BA_W, signed_distances, contact_edge_indexes_A,
+      node_positions_A);
+  ASSERT_EQ(filament_contact.contact_geometry_pairs().size(), 2);
+  {
+    const FilamentContactGeometryPair<double>& pair =
+        filament_contact.contact_geometry_pairs()[1];
+    EXPECT_EQ(pair.num_contact_points(), 1);
+    EXPECT_EQ(pair.p_WCs().size(), 1);
+    EXPECT_EQ(pair.nhats_BA_W().size(), 1);
+    EXPECT_EQ(pair.R_WCs().size(), 1);
+    EXPECT_EQ(pair.signed_distances().size(), 1);
+    EXPECT_EQ(pair.contact_edge_indexes_A().size(), 1);
+    EXPECT_EQ(pair.kinematic_weights_A().size(), 1);
+  }
+}
+
 }  // namespace
 }  // namespace internal
 }  // namespace geometry
