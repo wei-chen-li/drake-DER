@@ -5,7 +5,7 @@
 #include "drake/multibody/der/der_state.h"
 #include "drake/multibody/der/der_structural_property.h"
 #include "drake/multibody/der/der_undeformed_state.h"
-#include "drake/multibody/der/energy_hessian_matrix_utility.h"
+#include "drake/multibody/der/energy_hessian_matrix.h"
 
 namespace drake {
 namespace multibody {
@@ -35,29 +35,15 @@ void ComputeElasticEnergyJacobian(const DerStructuralProperty<T>& prop,
 
 /* Computes ∂²E/∂q².
 
- If `!state.has_closed_ends()`, ∂²E/∂q² occupies the top-left `num_dof() ×
- num_dof()` submatrix of `hessian` (size is off by 1).
- If `state.has_closed_ends()`, the size is exact.
-
  @pre `undeformed` and `state` are compatible.
  @pre `hessian != nullptr`.
- @pre `hessian` is created from MakeElasticEnergyHessianMatrix().
+ @pre `hessian` is allocated with the correct number of DoFs.
  @tparam_default_scalar */
 template <typename T>
 void ComputeElasticEnergyHessian(const DerStructuralProperty<T>& prop,
                                  const DerUndeformedState<T>& undeformed,
                                  const DerState<T>& state,
-                                 Block4x4SparseSymmetricMatrix<T>* hessian);
-
-/* Creates a Hessian matrix with the appropriate sparsity pattern, initialized
- to zero.
- @pre `num_nodes > 0`.
- @pre `num_edges > 0`.
- @pre `num_edges == (has_closed_ends ? num_nodes : num_nodes-1)`.
- @tparam_default_scalar */
-template <typename T>
-Block4x4SparseSymmetricMatrix<T> MakeElasticEnergyHessianMatrix(
-    bool has_closed_ends, int num_nodes, int num_edges);
+                                 EnergyHessianMatrix<T>* hessian);
 
 /* Computes Eₛ. */
 template <typename T>
@@ -77,7 +63,7 @@ template <typename T>
 void AddStretchingEnergyHessian(const DerStructuralProperty<T>& prop,
                                 const DerUndeformedState<T>& undeformed,
                                 const DerState<T>& state,
-                                Block4x4SparseSymmetricMatrix<T>* hessian);
+                                EnergyHessianMatrix<T>* hessian);
 
 /* Computes Eₜ. */
 template <typename T>
@@ -97,7 +83,7 @@ template <typename T>
 void AddTwistingEnergyHessian(const DerStructuralProperty<T>& prop,
                               const DerUndeformedState<T>& undeformed,
                               const DerState<T>& state,
-                              Block4x4SparseSymmetricMatrix<T>* hessian);
+                              EnergyHessianMatrix<T>* hessian);
 
 /* Computes Eₙ. */
 template <typename T>
@@ -117,7 +103,7 @@ template <typename T>
 void AddBendingEnergyHessian(const DerStructuralProperty<T>& prop,
                              const DerUndeformedState<T>& undeformed,
                              const DerState<T>& state,
-                             Block4x4SparseSymmetricMatrix<T>* hessian);
+                             EnergyHessianMatrix<T>* hessian);
 
 }  // namespace internal
 }  // namespace der

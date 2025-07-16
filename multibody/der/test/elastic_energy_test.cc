@@ -6,7 +6,6 @@
 #include <set>
 #include <vector>
 
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "drake/common/test_utilities/eigen_matrix_compare.h"
@@ -32,7 +31,7 @@ class ElasticEnergyTest : public ::testing::TestWithParam<bool> {
       const DerState<T>&, EigenPtr<Eigen::VectorX<T>>)>;
   using HessianCalcFuncType = std::function<void(
       const DerStructuralProperty<T>&, const DerUndeformedState<T>&,
-      const DerState<T>&, Block4x4SparseSymmetricMatrix<T>*)>;
+      const DerState<T>&, EnergyHessianMatrix<T>*)>;
 
   void SetUp() override {
     const bool has_closed_ends = GetParam();
@@ -82,13 +81,10 @@ class ElasticEnergyTest : public ::testing::TestWithParam<bool> {
 
   void CheckHessian(JacobianCalcFuncType jacobian_calc_func,
                     HessianCalcFuncType hessian_calc_func) const {
-    Block4x4SparseSymmetricMatrix<T> hessian =
-        MakeElasticEnergyHessianMatrix<T>(state_->has_closed_ends(),
-                                          state_->num_nodes(),
-                                          state_->num_edges());
+    EnergyHessianMatrix<T> hessian =
+        EnergyHessianMatrix<T>::Allocate(state_->num_dofs());
     hessian_calc_func(*prop_, *undeformed_, *state_, &hessian);
-    Eigen::MatrixXd matrix = hessian.MakeDenseMatrix();
-    auto d2Edq2 = matrix.topLeftCorner(state_->num_dofs(), state_->num_dofs());
+    Eigen::MatrixXd d2Edq2 = math::ExtractValue(hessian.MakeDenseMatrix());
 
     Eigen::VectorX<T> jacobian(state_->num_dofs());
     jacobian.setZero();
@@ -140,73 +136,6 @@ TEST_P(ElasticEnergyTest, TotalElasticEnergyJacobian) {
 TEST_P(ElasticEnergyTest, TotalElasticEnergyHessian) {
   CheckHessian(&ComputeElasticEnergyJacobian<T>,
                &ComputeElasticEnergyHessian<T>);
-}
-
-TEST_P(ElasticEnergyTest, MakeElasticEnergyHessianMatrix) {
-  const bool has_closed_ends = state_->has_closed_ends();
-  const int num_nodes = 301;
-  const int num_edges = has_closed_ends ? num_nodes : num_nodes - 1;
-  const int num_internal_nodes = has_closed_ends ? num_nodes : num_nodes - 2;
-
-  // pattern[block_i] stores the set of block_j indices that are nonzero.
-  std::vector<std::set<int>> pattern(num_nodes);
-
-  for (int i = 0; i < num_edges; ++i) {
-    const int node_i = i;
-    const int node_ip1 = (i + 1) % num_nodes;
-    pattern[node_i].insert(node_i);
-    pattern[node_i].insert(node_ip1);
-    pattern[node_ip1].insert(node_i);
-    pattern[node_ip1].insert(node_ip1);
-  }
-  for (int i = 0; i < num_internal_nodes; ++i) {
-    const int node_i = i;
-    const int node_ip1 = (i + 1) % num_nodes;
-    const int node_ip2 = (i + 2) % num_nodes;
-    pattern[node_i].insert(node_i);
-    pattern[node_i].insert(node_ip1);
-    pattern[node_i].insert(node_ip2);
-    pattern[node_ip1].insert(node_i);
-    pattern[node_ip1].insert(node_ip1);
-    pattern[node_ip1].insert(node_ip2);
-    pattern[node_ip1].insert(node_i);
-    pattern[node_ip2].insert(node_ip1);
-    pattern[node_ip2].insert(node_ip2);
-
-    const int edge_i = i;
-    const int edge_ip1 = (i + 1) % num_edges;
-    pattern[edge_i].insert(edge_i);
-    pattern[edge_i].insert(edge_ip1);
-    pattern[edge_ip1].insert(edge_i);
-    pattern[edge_ip1].insert(edge_ip1);
-
-    pattern[node_i].insert(edge_i);
-    pattern[node_i].insert(edge_ip1);
-    pattern[node_ip1].insert(edge_i);
-    pattern[node_ip1].insert(edge_ip1);
-    pattern[node_ip2].insert(edge_i);
-    pattern[node_ip2].insert(edge_ip1);
-
-    pattern[edge_i].insert(node_i);
-    pattern[edge_i].insert(node_ip1);
-    pattern[edge_i].insert(node_ip2);
-    pattern[edge_ip1].insert(node_i);
-    pattern[edge_ip1].insert(node_ip1);
-    pattern[edge_ip1].insert(node_ip2);
-  }
-
-  Block4x4SparseSymmetricMatrix<T> hessian =
-      MakeElasticEnergyHessianMatrix<T>(has_closed_ends, num_nodes, num_edges);
-  for (int i = 0; i < ssize(pattern); ++i) {
-    std::set<int>& row_pattern = pattern[i];
-
-    // Remove indices in row_pattern that are smaller than i (leave only upper
-    // triangle indices).
-    row_pattern.erase(row_pattern.begin(), row_pattern.lower_bound(i));
-
-    EXPECT_THAT(hessian.sparsity_pattern().neighbors()[i],
-                ::testing::UnorderedElementsAreArray(row_pattern));
-  }
 }
 
 }  // namespace

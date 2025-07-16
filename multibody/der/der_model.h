@@ -8,14 +8,13 @@
 #include <variant>
 #include <vector>
 
-#include "drake/common/identifier.h"
 #include "drake/multibody/der/damping_model.h"
 #include "drake/multibody/der/der_indexes.h"
 #include "drake/multibody/der/der_state.h"
 #include "drake/multibody/der/der_structural_property.h"
 #include "drake/multibody/der/der_undeformed_state.h"
 #include "drake/multibody/der/dirichlet_boundary_condition.h"
-#include "drake/multibody/der/energy_hessian_matrix_utility.h"
+#include "drake/multibody/der/energy_hessian_matrix.h"
 #include "drake/multibody/der/external_force_field.h"
 
 namespace drake {
@@ -250,10 +249,6 @@ class DerModel {
    freedom under the Dirichlet boundary condition is set to zero with the
    exception of the diagonal entries which is set to one.
 
-   If not `has_closed_ends()` meaning `result.rows() == num_dofs() + 1`,
-   the last row and last column of the returned `result` is zero with the
-   exception of the last diagonal entry which is set to one.
-
    @param[in] state The @p DerState at which the tangent matrix is evaluated.
    @param[in] weights The weights used to combine stiffness, damping, and mass
                       matrices (in that order) into the tangent matrix.
@@ -264,7 +259,7 @@ class DerModel {
    @pre `state` is allocated using CreateDerState() of the same DerModel.
    @pre `scratch != nullptr`.
    @pre `scratch` is allocated using MakeScratch() of the same DerModel. */
-  const internal::Block4x4SparseSymmetricMatrix<T>& ComputeTangentMatrix(
+  const internal::EnergyHessianMatrix<T>& ComputeTangentMatrix(
       const internal::DerState<T>& state, const std::array<T, 3>& weights,
       Scratch* scratch) const;
 

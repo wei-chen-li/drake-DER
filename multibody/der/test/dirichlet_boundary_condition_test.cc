@@ -5,6 +5,7 @@
 #include "drake/common/test_utilities/eigen_matrix_compare.h"
 #include "drake/common/test_utilities/expect_throws_message.h"
 #include "drake/common/test_utilities/limit_malloc.h"
+#include "drake/common/text_logging.h"
 #include "drake/multibody/der/elastic_energy.h"
 
 namespace drake {
@@ -13,7 +14,7 @@ namespace der {
 namespace internal {
 namespace {
 
-using Eigen::Matrix4d;
+using Eigen::Matrix3d;
 using Eigen::MatrixXd;
 using Eigen::Vector3d;
 using Eigen::VectorXd;
@@ -42,19 +43,40 @@ class DirichletBoundaryConditionTest : public ::testing::Test {
     bc_.AddBoundaryCondition(DerEdgeIndex(1), edge_state_);
   }
 
-  Block4x4SparseSymmetricMatrix<double> MakeTangentMatrix() const {
-    Block4x4SparseSymmetricMatrix<double> tangent_matrix =
-        MakeElasticEnergyHessianMatrix<double>(state_->has_closed_ends(),
-                                               state_->num_nodes(),
-                                               state_->num_edges());
-    EXPECT_EQ(tangent_matrix.rows(), kDofs);
-    tangent_matrix.SetBlock(0, 0, Matrix4d::Constant(5));
-    tangent_matrix.SetBlock(1, 0, Matrix4d::Constant(4));
-    tangent_matrix.SetBlock(2, 0, Matrix4d::Constant(3));
-    tangent_matrix.SetBlock(1, 1, Matrix4d::Constant(6));
-    tangent_matrix.SetBlock(2, 1, Matrix4d::Constant(2));
-    tangent_matrix.SetBlock(2, 2, Matrix4d::Constant(7));
-    return tangent_matrix;
+  EnergyHessianMatrix<double> MakeTangentMatrix() const {
+    EnergyHessianMatrix<double> mat =
+        EnergyHessianMatrix<double>::Allocate(kDofs);
+    EXPECT_EQ(mat.rows(), kDofs);
+    for (int i = 0; i < 3; ++i) {
+      for (int j = i; j < 3; ++j) {
+        const double val = (i != j) ? (i + j) : i + 4.0;
+        mat.Insert(DerNodeIndex(i), DerNodeIndex(j), Matrix3d::Constant(val));
+        mat.Insert(DerNodeIndex(i), DerEdgeIndex(j), Vector3d::Constant(val));
+        mat.Insert(DerEdgeIndex(i), DerEdgeIndex(j), val);
+        if (i == j) continue;
+        mat.Insert(DerNodeIndex(j), DerEdgeIndex(i), Vector3d::Constant(val));
+      }
+    }
+
+    MatrixXd expected_mat(kDofs, kDofs);
+    // clang-format off
+    expected_mat << 4, 4, 4, 4,   1, 1, 1, 1,   2, 2, 2, 2,
+                    4, 4, 4, 4,   1, 1, 1, 1,   2, 2, 2, 2,
+                    4, 4, 4, 4,   1, 1, 1, 1,   2, 2, 2, 2,
+                    4, 4, 4, 4,   1, 1, 1, 1,   2, 2, 2, 2,
+
+                    1, 1, 1, 1,   5, 5, 5, 5,   3, 3, 3, 3,
+                    1, 1, 1, 1,   5, 5, 5, 5,   3, 3, 3, 3,
+                    1, 1, 1, 1,   5, 5, 5, 5,   3, 3, 3, 3,
+                    1, 1, 1, 1,   5, 5, 5, 5,   3, 3, 3, 3,
+
+                    2, 2, 2, 2,   3, 3, 3, 3,   6, 6, 6, 6,
+                    2, 2, 2, 2,   3, 3, 3, 3,   6, 6, 6, 6,
+                    2, 2, 2, 2,   3, 3, 3, 3,   6, 6, 6, 6,
+                    2, 2, 2, 2,   3, 3, 3, 3,   6, 6, 6, 6;
+    // clang-format on
+    EXPECT_TRUE(CompareMatrices(mat.MakeDenseMatrix(), expected_mat));
+    return mat;
   }
 
   static constexpr int kDofs = 12;
@@ -119,7 +141,8 @@ TEST_F(DirichletBoundaryConditionTest, ApplyHomogeneousBoundaryCondition) {
 /* Tests that the DirichletBoundaryCondition under test successfully modifies a
  given tangent matrix. */
 TEST_F(DirichletBoundaryConditionTest, ApplyBoundaryConditionToTangentMatrix) {
-  Block4x4SparseSymmetricMatrix<double> tangent_matrix = MakeTangentMatrix();
+  EnergyHessianMatrix<double> tangent_matrix = MakeTangentMatrix();
+  drake::log()->info("\n{}", fmt_eigen(tangent_matrix.MakeDenseMatrix()));
   {
     LimitMalloc guard;
     bc_.ApplyBoundaryConditionToTangentMatrix(&tangent_matrix);
@@ -130,17 +153,17 @@ TEST_F(DirichletBoundaryConditionTest, ApplyBoundaryConditionToTangentMatrix) {
   expected_tangent_matrix << 1, 0, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,
                              0, 1, 0, 0,   0, 0, 0, 0,   0, 0, 0, 0,
                              0, 0, 1, 0,   0, 0, 0, 0,   0, 0, 0, 0,
-                             0, 0, 0, 5,   4, 4, 4, 0,   3, 3, 3, 3,
+                             0, 0, 0, 4,   1, 1, 1, 0,   2, 2, 2, 2,
 
-                             0, 0, 0, 4,   6, 6, 6, 0,   2, 2, 2, 2,
-                             0, 0, 0, 4,   6, 6, 6, 0,   2, 2, 2, 2,
-                             0, 0, 0, 4,   6, 6, 6, 0,   2, 2, 2, 2,
+                             0, 0, 0, 1,   5, 5, 5, 0,   3, 3, 3, 3,
+                             0, 0, 0, 1,   5, 5, 5, 0,   3, 3, 3, 3,
+                             0, 0, 0, 1,   5, 5, 5, 0,   3, 3, 3, 3,
                              0, 0, 0, 0,   0, 0, 0, 1,   0, 0, 0, 0,
 
-                             0, 0, 0, 3,   2, 2, 2, 0,   7, 7, 7, 7,
-                             0, 0, 0, 3,   2, 2, 2, 0,   7, 7, 7, 7,
-                             0, 0, 0, 3,   2, 2, 2, 0,   7, 7, 7, 7,
-                             0, 0, 0, 3,   2, 2, 2, 0,   7, 7, 7, 7;
+                             0, 0, 0, 2,   3, 3, 3, 0,   6, 6, 6, 6,
+                             0, 0, 0, 2,   3, 3, 3, 0,   6, 6, 6, 6,
+                             0, 0, 0, 2,   3, 3, 3, 0,   6, 6, 6, 6,
+                             0, 0, 0, 2,   3, 3, 3, 0,   6, 6, 6, 6;
   // clang-format on
 
   EXPECT_TRUE(CompareMatrices(tangent_matrix.MakeDenseMatrix(),
@@ -159,7 +182,7 @@ TEST_F(DirichletBoundaryConditionTest, NodeOutOfBound) {
   DRAKE_EXPECT_THROWS_MESSAGE(
       bc_.ApplyHomogeneousBoundaryCondition(&residual),
       "A node index of the Dirichlet boundary condition is out of range.");
-  Block4x4SparseSymmetricMatrix<double> tangent_matrix = MakeTangentMatrix();
+  EnergyHessianMatrix<double> tangent_matrix = MakeTangentMatrix();
   DRAKE_EXPECT_THROWS_MESSAGE(
       bc_.ApplyBoundaryConditionToTangentMatrix(&tangent_matrix),
       "A node index of the Dirichlet boundary condition is out of range.");
@@ -175,7 +198,7 @@ TEST_F(DirichletBoundaryConditionTest, EdgeOutOfBound) {
   DRAKE_EXPECT_THROWS_MESSAGE(
       bc_.ApplyHomogeneousBoundaryCondition(&residual),
       "An edge index of the Dirichlet boundary condition is out of range.");
-  Block4x4SparseSymmetricMatrix<double> tangent_matrix = MakeTangentMatrix();
+  EnergyHessianMatrix<double> tangent_matrix = MakeTangentMatrix();
   DRAKE_EXPECT_THROWS_MESSAGE(
       bc_.ApplyBoundaryConditionToTangentMatrix(&tangent_matrix),
       "An edge index of the Dirichlet boundary condition is out of range.");

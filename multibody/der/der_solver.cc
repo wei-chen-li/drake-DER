@@ -17,11 +17,12 @@ DerSolver<T>::DerSolver(const DerModel<T>* model,
   /* Allocate the scratch for the DerModel. */
   scratch_.der_model_scratch = model_->MakeScratch();
   /* Tell SimplicialLDLT the sparsity pattern. */
-  const Block4x4SparseSymmetricMatrix<T>& A = model_->ComputeTangentMatrix(
+  const EnergyHessianMatrix<T>& A = model_->ComputeTangentMatrix(
       *state_, integrator_->GetWeights(), scratch_.der_model_scratch.get());
-  scratch_.linear_solver.analyzePattern(Convert(A));
-  /* Set b to size that matches the tangent matrix. */
+  scratch_.linear_solver.analyzePattern(A.ComputeLowerTriangle());
+  /* Set b and dz to size that matches the tangent matrix. */
   scratch_.b = Eigen::VectorX<T>::Zero(A.rows());
+  scratch_.dz = Eigen::VectorX<T>::Zero(A.cols());
 }
 
 template <typename T>
@@ -36,16 +37,13 @@ int DerSolver<T>::AdvanceOneTimeStep(
   Eigen::SimplicialLDLT<Eigen::SparseMatrix<T>, Eigen::Lower>& linear_solver =
       scratch_.linear_solver;
   Eigen::VectorX<T>& b = scratch_.b;
-  const int num_dofs = model_->num_dofs();
+  Eigen::VectorX<T>& dz = scratch_.dz;
   DRAKE_DEMAND(der_model_scratch != nullptr);
-  DRAKE_DEMAND(b.size() ==
-               (model_->has_closed_ends() ? num_dofs : num_dofs + 1));
 
   const Eigen::VectorX<T>& z = integrator_->GetUnknowns(prev_state);
   integrator_->AdvanceOneTimeStep(prev_state, z, &state);
   model_->ApplyBoundaryCondition(&state);
-  b.head(num_dofs) =
-      -model_->ComputeResidual(state, external_force_field, der_model_scratch);
+  b = model_->ComputeResidual(state, external_force_field, der_model_scratch);
   T residual_norm = unit_adjusted_norm(b);
   const T initial_residual_norm = residual_norm;
   int iter = 0;
@@ -56,18 +54,16 @@ int DerSolver<T>::AdvanceOneTimeStep(
       initial residual) is smaller than the dimensionless relative tolerance. */
   while (iter < max_iterations_ &&
          !solver_converged(residual_norm, initial_residual_norm)) {
-    const internal::Block4x4SparseSymmetricMatrix<T>& tangent_matrix =
-        model_->ComputeTangentMatrix(state, integrator_->GetWeights(),
-                                     der_model_scratch);
+    const EnergyHessianMatrix<T>& tangent_matrix = model_->ComputeTangentMatrix(
+        state, integrator_->GetWeights(), der_model_scratch);
     /* If the contact energy is not enabled, the sparsity pattern of the tangent
      matrix does not change and thus we call UpdateMatrix(). */
-    linear_solver.factorize(Convert(tangent_matrix));
+    linear_solver.factorize(tangent_matrix.ComputeLowerTriangle());
     DRAKE_DEMAND(linear_solver.info() == Eigen::Success);
-    auto dz = linear_solver.solve(b).head(num_dofs);
+    dz = linear_solver.solve(-b);
     DRAKE_DEMAND(linear_solver.info() == Eigen::Success);
     integrator_->AdjustStateFromChangeInUnknowns(dz, &state);
-    b.head(num_dofs) = -model_->ComputeResidual(state, external_force_field,
-                                                der_model_scratch);
+    b = model_->ComputeResidual(state, external_force_field, der_model_scratch);
     residual_norm = unit_adjusted_norm(b);
     ++iter;
   }
@@ -91,11 +87,10 @@ void DerSolver<T>::ComputeTangentMatrixSchurComplement(
       scratch_.der_model_scratch.get();
   DRAKE_DEMAND(der_model_scratch != nullptr);
 
-  const internal::Block4x4SparseSymmetricMatrix<T>& tangent_matrix =
-      model_->ComputeTangentMatrix(state, integrator_->GetWeights(),
-                                   der_model_scratch);
+  const EnergyHessianMatrix<T>& tangent_matrix = model_->ComputeTangentMatrix(
+      state, integrator_->GetWeights(), der_model_scratch);
   tangent_matrix_schur_complement_ =
-      ComputeSchurComplement(tangent_matrix, participating_dofs);
+      tangent_matrix.ComputeSchurComplement(participating_dofs);
 }
 
 template <typename T>

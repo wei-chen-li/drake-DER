@@ -4,10 +4,9 @@
 #include <unordered_set>
 
 #include "drake/common/copyable_unique_ptr.h"
-#include "drake/multibody/contact_solvers/block_sparse_cholesky_solver.h"
 #include "drake/multibody/der/der_model.h"
 #include "drake/multibody/der/discrete_time_integrator.h"
-#include "drake/multibody/der/energy_hessian_matrix_utility.h"
+#include "drake/multibody/der/schur_complement.h"
 
 namespace drake {
 namespace multibody {
@@ -123,6 +122,7 @@ class DerSolver {
         der_model_scratch;
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<T>, Eigen::Lower> linear_solver;
     Eigen::VectorX<T> b;
+    Eigen::VectorX<T> dz;
   } scratch_;
 };
 

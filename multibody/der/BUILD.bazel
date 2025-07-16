@@ -16,7 +16,7 @@ drake_cc_package_library(
     deps = [
         ":acceleration_newmark_scheme",
         ":constraint_participation",
-        ":contact_energy",
+        # ":contact_energy",
         ":damping_model",
         ":der_indexes",
         ":der_model",
@@ -28,7 +28,7 @@ drake_cc_package_library(
         ":dirichlet_boundary_condition",
         ":discrete_time_integrator",
         ":elastic_energy",
-        ":energy_hessian_matrix_utility",
+        ":energy_hessian_matrix",
         ":external_force_field",
         ":schur_complement",
         ":velocity_newmark_scheme",
@@ -53,19 +53,18 @@ drake_cc_library(
     ],
 )
 
-drake_cc_library(
-    name = "contact_energy",
-    srcs = ["contact_energy.cc"],
-    hdrs = ["contact_energy.h"],
-    deps = [
-        ":der_indexes",
-        ":der_state",
-        ":der_undeformed_state",
-        ":energy_hessian_matrix_utility",
-        "//geometry/proximity:filament_self_contact_filter",
-        "//math:matrix_util",
-    ],
-)
+# drake_cc_library(
+#     name = "contact_energy",
+#     srcs = ["contact_energy.cc"],
+#     hdrs = ["contact_energy.h"],
+#     deps = [
+#         ":der_indexes",
+#         ":der_state",
+#         ":der_undeformed_state",
+#         "//geometry/proximity:filament_self_contact_filter",
+#         "//math:matrix_util",
+#     ],
+# )
 
 drake_cc_library(
     name = "damping_model",
@@ -89,7 +88,6 @@ drake_cc_library(
     srcs = ["der_model.cc"],
     hdrs = ["der_model.h"],
     deps = [
-        ":contact_energy",
         ":damping_model",
         ":der_indexes",
         ":der_state",
@@ -97,7 +95,7 @@ drake_cc_library(
         ":der_undeformed_state",
         ":dirichlet_boundary_condition",
         ":elastic_energy",
-        ":energy_hessian_matrix_utility",
+        ":energy_hessian_matrix",
         ":external_force_field",
         "//common:pointer_cast",
         "//math:vector3_util",
@@ -163,7 +161,7 @@ drake_cc_library(
     deps = [
         ":der_indexes",
         ":der_state",
-        ":energy_hessian_matrix_utility",
+        ":energy_hessian_matrix",
     ],
 )
 
@@ -181,20 +179,20 @@ drake_cc_library(
     srcs = ["elastic_energy.cc"],
     hdrs = ["elastic_energy.h"],
     deps = [
-        ":der_indexes",
         ":der_state",
         ":der_structural_property",
         ":der_undeformed_state",
-        ":energy_hessian_matrix_utility",
+        ":energy_hessian_matrix",
         "//math:vector3_util",
     ],
 )
 
 drake_cc_library(
-    name = "energy_hessian_matrix_utility",
-    srcs = ["energy_hessian_matrix_utility.cc"],
-    hdrs = ["energy_hessian_matrix_utility.h"],
+    name = "energy_hessian_matrix",
+    srcs = ["energy_hessian_matrix.cc"],
+    hdrs = ["energy_hessian_matrix.h"],
     deps = [
+        ":der_indexes",
         ":schur_complement",
         "//common:default_scalars",
         "//multibody/contact_solvers:block_sparse_lower_triangular_or_symmetric_matrix",  # noqa
@@ -251,15 +249,15 @@ drake_cc_googletest(
     ],
 )
 
-drake_cc_googletest(
-    name = "contact_energy_test",
-    deps = [
-        ":contact_energy",
-        "//common/test_utilities:eigen_matrix_compare",
-        "//math:gradient",
-        "//multibody/der/test_utilities:autodiff_autodiff",
-    ],
-)
+# drake_cc_googletest(
+#     name = "contact_energy_test",
+#     deps = [
+#         ":contact_energy",
+#         "//common/test_utilities:eigen_matrix_compare",
+#         "//math:gradient",
+#         "//multibody/der/test_utilities:autodiff_autodiff",
+#     ],
+# )
 
 drake_cc_googletest(
     name = "damping_model_test",
@@ -349,10 +347,9 @@ drake_cc_googletest(
 )
 
 drake_cc_googletest(
-    name = "energy_hessian_matrix_utility_test",
+    name = "energy_hessian_matrix_test",
     deps = [
-        ":elastic_energy",
-        ":energy_hessian_matrix_utility",
+        ":energy_hessian_matrix",
         "//common/test_utilities:eigen_matrix_compare",
         "//common/test_utilities:limit_malloc",
     ],

@@ -82,39 +82,19 @@ void DirichletBoundaryCondition<T>::ApplyHomogeneousBoundaryCondition(
 
 template <typename T>
 void DirichletBoundaryCondition<T>::ApplyBoundaryConditionToTangentMatrix(
-    Block4x4SparseSymmetricMatrix<T>* tangent_matrix) const {
+    EnergyHessianMatrix<T>* tangent_matrix) const {
   DRAKE_DEMAND(tangent_matrix != nullptr);
   this->VerifyIndices(tangent_matrix->rows());
   if (node_to_boundary_state_.empty() && edge_to_boundary_state_.empty())
     return;
 
-  const auto& sparsity_pattern_neighbors =
-      tangent_matrix->sparsity_pattern().neighbors();
   for (const auto& pair : node_to_boundary_state_) {
     const DerNodeIndex node_index = pair.first;
-    for (int j = 0; j < tangent_matrix->block_cols(); ++j) {
-      for (int i : sparsity_pattern_neighbors[j]) {  // i ≥ j
-        if (!(i == node_index || j == node_index)) continue;
-        Eigen::Matrix4<T> block = tangent_matrix->block(i, j);
-        if (i == node_index) block.template topRows<3>().setZero();
-        if (j == node_index) block.template leftCols<3>().setZero();
-        if (i == j) block.template topLeftCorner<3, 3>().setIdentity();
-        tangent_matrix->SetBlock(i, j, block);
-      }
-    }
+    tangent_matrix->ApplyBoundaryCondition(node_index);
   }
   for (const auto& pair : edge_to_boundary_state_) {
     const DerEdgeIndex edge_index = pair.first;
-    for (int j = 0; j < tangent_matrix->block_cols(); ++j) {
-      for (int i : sparsity_pattern_neighbors[j]) {  // i ≥ j
-        if (!(i == edge_index || j == edge_index)) continue;
-        Eigen::Matrix4<T> block = tangent_matrix->block(i, j);
-        if (i == edge_index) block.template bottomRows<1>().setZero();
-        if (j == edge_index) block.template rightCols<1>().setZero();
-        if (i == j) block(3, 3) = 1.0;
-        tangent_matrix->SetBlock(i, j, block);
-      }
-    }
+    tangent_matrix->ApplyBoundaryCondition(edge_index);
   }
 }
 

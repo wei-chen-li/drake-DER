@@ -4,7 +4,7 @@
 
 #include "drake/multibody/der/der_indexes.h"
 #include "drake/multibody/der/der_state.h"
-#include "drake/multibody/der/energy_hessian_matrix_utility.h"
+#include "drake/multibody/der/energy_hessian_matrix.h"
 
 namespace drake {
 namespace multibody {
@@ -100,7 +100,7 @@ class DirichletBoundaryCondition {
    @throw std::exception if the index of any DoF subject to `this` BC is greater
           than or equal to `tangent_matrix->rows()`. */
   void ApplyBoundaryConditionToTangentMatrix(
-      Block4x4SparseSymmetricMatrix<T>* tangent_matrix) const;
+      EnergyHessianMatrix<T>* tangent_matrix) const;
 
   template <typename U>
   DirichletBoundaryCondition<U> ToScalarType() const;

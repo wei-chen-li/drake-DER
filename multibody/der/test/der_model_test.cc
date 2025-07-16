@@ -353,8 +353,8 @@ TEST_P(DerModelTest, ComputeResidual) {
   VectorXd dEdq(num_dofs);
   internal::ComputeElasticEnergyJacobian<double>(prop, undeformed, *state,
                                                  &dEdq);
-  auto d2Edq2 = internal::MakeElasticEnergyHessianMatrix<double>(
-      state->has_closed_ends(), state->num_nodes(), state->num_edges());
+  auto d2Edq2 =
+      internal::EnergyHessianMatrix<double>::Allocate(state->num_dofs());
   internal::ComputeElasticEnergyHessian(prop, undeformed, *state, &d2Edq2);
 
   MatrixXd M = ComputeMassMatrix(prop, undeformed).toDenseMatrix();
@@ -381,7 +381,7 @@ TEST_P(DerModelTest, ComputeTangentMatrix) {
   std::array<double, 3> weights = {1.2, 3.4, 5.6};
 
   auto scratch = der_model_->MakeScratch();
-  const internal::Block4x4SparseSymmetricMatrix<double>* tangent_matrix;
+  const internal::EnergyHessianMatrix<double>* tangent_matrix;
   {
     LimitMalloc guard;
     tangent_matrix =
@@ -395,8 +395,8 @@ TEST_P(DerModelTest, ComputeTangentMatrix) {
   const auto& damping = DerModelTester::get_damping_model(*der_model_);
   const int num_dofs = state->num_dofs();
 
-  auto d2Edq2 = internal::MakeElasticEnergyHessianMatrix<double>(
-      state->has_closed_ends(), state->num_nodes(), state->num_edges());
+  auto d2Edq2 =
+      internal::EnergyHessianMatrix<double>::Allocate(state->num_dofs());
   internal::ComputeElasticEnergyHessian(prop, undeformed, *state, &d2Edq2);
 
   MatrixXd M = ComputeMassMatrix(prop, undeformed).toDenseMatrix();
@@ -417,19 +417,8 @@ TEST_P(DerModelTest, ComputeTangentMatrix) {
     expected(4 * index + 3, 4 * index + 3) = 1.0;
   }
 
-  const double kTol = 1e-9;
-  if (der_model_->has_closed_ends()) {
-    EXPECT_TRUE(
-        CompareMatrices(tangent_matrix->MakeDenseMatrix(), expected, kTol));
-    return;
-  }
-  const MatrixXd result = tangent_matrix->MakeDenseMatrix();
-  EXPECT_TRUE(CompareMatrices(result.topLeftCorner(num_dofs, num_dofs),
-                              expected, kTol));
-  /* Last diagonal entry must be 1 per ComputeTangentMatrix() documentation. */
-  EXPECT_EQ(result(num_dofs, num_dofs), 1.0);
-  EXPECT_TRUE(result.topRightCorner(num_dofs, 1).isZero());
-  EXPECT_TRUE(result.bottomLeftCorner(1, num_dofs).isZero());
+  EXPECT_TRUE(
+      CompareMatrices(tangent_matrix->MakeDenseMatrix(), expected, 1e-9));
 }
 
 TEST_P(DerModelTest, ApplyBoundaryCondition) {

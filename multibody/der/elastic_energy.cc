@@ -36,46 +36,6 @@ auto eye() {
   return Matrix3<T>::Identity();
 }
 
-/* Add mat = ∂²E/∂(xᵢ)(xⱼ) to the hessian.  */
-template <typename T>
-void AddTo(Block4x4SparseSymmetricMatrix<T>* hessian, DerNodeIndex i,
-           DerNodeIndex j, const Eigen::Ref<const Matrix3<T>>& mat) {
-  Eigen::Matrix4<T> filler = Eigen::Matrix4<T>::Zero();
-  filler.template topLeftCorner<3, 3>() = mat;
-  if (int{i} >= int{j})
-    hessian->AddToBlock(i, j, filler);
-  else
-    hessian->AddToBlock(j, i, filler.transpose());
-}
-
-/* Add vec = ∂²E/∂(xᵢ)(γʲ) to the hessian.  */
-template <typename T>
-void AddTo(Block4x4SparseSymmetricMatrix<T>* hessian, DerNodeIndex i,
-           DerEdgeIndex j, const Eigen::Ref<const Vector3<T>>& vec) {
-  Eigen::Matrix4<T> filler = Eigen::Matrix4<T>::Zero();
-  filler.template topRightCorner<3, 1>() = vec;
-  if (int{i} == int{j}) {
-    hessian->AddToBlock(i, j, filler + filler.transpose());
-  } else {
-    if (int{i} > int{j})
-      hessian->AddToBlock(i, j, filler);
-    else
-      hessian->AddToBlock(j, i, filler.transpose());
-  }
-}
-
-/* Add val = ∂²E/∂(γⁱ)(γʲ) to the hessian.  */
-template <typename T>
-void AddTo(Block4x4SparseSymmetricMatrix<T>* hessian, DerEdgeIndex i,
-           DerEdgeIndex j, const T& val) {
-  Eigen::Matrix4<T> filler = Eigen::Matrix4<T>::Zero();
-  filler(3, 3) = val;
-  if (int{i} >= int{j})
-    hessian->AddToBlock(i, j, filler);
-  else
-    hessian->AddToBlock(j, i, filler.transpose());
-}
-
 /* Usage: ASSERT_NUM_COLS(matrix1, matrix2, ...,matrixN, number). Assert all
  matrices have the `number` of columns. */
 template <typename First>
@@ -126,69 +86,16 @@ template <typename T>
 void ComputeElasticEnergyHessian(const DerStructuralProperty<T>& prop,
                                  const DerUndeformedState<T>& undeformed,
                                  const DerState<T>& state,
-                                 Block4x4SparseSymmetricMatrix<T>* hessian) {
+                                 EnergyHessianMatrix<T>* hessian) {
   DRAKE_THROW_UNLESS(undeformed.has_closed_ends() == state.has_closed_ends());
   DRAKE_THROW_UNLESS(undeformed.num_nodes() == state.num_nodes());
-  const int hessian_rows =
-      state.has_closed_ends() ? state.num_dofs() : state.num_dofs() + 1;
   DRAKE_THROW_UNLESS(hessian != nullptr);
-  DRAKE_THROW_UNLESS(hessian->rows() == hessian_rows &&
-                     hessian->cols() == hessian_rows);
+  DRAKE_THROW_UNLESS(hessian->rows() == state.num_dofs() &&
+                     hessian->cols() == state.num_dofs());
   hessian->SetZero();
   AddStretchingEnergyHessian(prop, undeformed, state, hessian);
   AddTwistingEnergyHessian(prop, undeformed, state, hessian);
   AddBendingEnergyHessian(prop, undeformed, state, hessian);
-}
-
-template <typename T>
-Block4x4SparseSymmetricMatrix<T> MakeElasticEnergyHessianMatrix(
-    bool has_closed_ends, int num_nodes, int num_edges) {
-  DRAKE_THROW_UNLESS(num_edges ==
-                     (has_closed_ends ? num_nodes : num_nodes - 1));
-  std::vector<int> block_sizes(num_nodes, 4);
-
-  std::vector<std::vector<int>> neighbors(num_nodes);
-  if (!has_closed_ends) {
-    /*
-     ⎡ ██ ██ ██             ⎤
-     ⎢ ██ ██ ██ ██          ⎥
-     ⎢ ██ ██ ██ ██ ██       ⎥
-     ⎢    ██ ██ ██ ██ ██    ⎥
-     ⎢       ██ ██ ██ ██ ██ ⎥
-     ⎢          ██ ██ ██ ██ ⎥
-     ⎣             ██ ██ ██ ⎦
-    */
-    for (int i = 0; i < num_nodes; ++i) {
-      neighbors[i].push_back(i);
-      if (i + 1 < num_nodes) neighbors[i].push_back(i + 1);
-      if (i + 2 < num_nodes) neighbors[i].push_back(i + 2);
-    }
-  } else {
-    /*
-     ⎡ ██ ██ ██       ██ ██ ⎤
-     ⎢ ██ ██ ██ ██       ██ ⎥
-     ⎢ ██ ██ ██ ██ ██       ⎥
-     ⎢    ██ ██ ██ ██ ██    ⎥
-     ⎢       ██ ██ ██ ██ ██ ⎥
-     ⎢ ██       ██ ██ ██ ██ ⎥
-     ⎣ ██ ██       ██ ██ ██ ⎦
-    */
-    for (int i = 0; i < num_nodes; ++i) {
-      neighbors[i].push_back(i);
-      if (i + 1 < num_nodes)
-        neighbors[i].push_back(i + 1);
-      else
-        neighbors[(i + 1) % num_nodes].push_back(i);
-      if (i + 2 < num_nodes)
-        neighbors[i].push_back(i + 2);
-      else
-        neighbors[(i + 2) % num_nodes].push_back(i);
-    }
-  }
-
-  contact_solvers::internal::BlockSparsityPattern block_sparsity_pattern(
-      std::move(block_sizes), std::move(neighbors));
-  return Block4x4SparseSymmetricMatrix<T>(std::move(block_sparsity_pattern));
 }
 
 template <typename T>
@@ -225,10 +132,10 @@ void AddStretchingEnergyJacobian(const DerStructuralProperty<T>& prop,
     Vector3<T> grad_E_ei =
         (l[i] / l_undeformed[i] - 1.0) * tangent.col(i) * prop.EA();
 
-    const int node_i = 4 * i;
-    const int node_ip1 = 4 * ((i + 1) % state.num_nodes());
-    jacobian->template segment<3>(node_i) -= grad_E_ei;
-    jacobian->template segment<3>(node_ip1) += grad_E_ei;
+    const int dof_node_i = 4 * i;
+    const int dof_node_ip1 = 4 * ((i + 1) % state.num_nodes());
+    jacobian->template segment<3>(dof_node_i) -= grad_E_ei;
+    jacobian->template segment<3>(dof_node_ip1) += grad_E_ei;
   }
 }
 
@@ -236,7 +143,7 @@ template <typename T>
 void AddStretchingEnergyHessian(const DerStructuralProperty<T>& prop,
                                 const DerUndeformedState<T>& undeformed,
                                 const DerState<T>& state,
-                                Block4x4SparseSymmetricMatrix<T>* hessian) {
+                                EnergyHessianMatrix<T>* hessian) {
   DRAKE_THROW_UNLESS(hessian != nullptr);
 
   const auto& l_undeformed = undeformed.get_edge_length();
@@ -253,9 +160,9 @@ void AddStretchingEnergyHessian(const DerStructuralProperty<T>& prop,
 
     const DerNodeIndex node_i(i);
     const DerNodeIndex node_ip1((i + 1) % state.num_nodes());
-    AddTo<T>(hessian, node_i, node_i, grad2_E_ei_ei);
-    AddTo<T>(hessian, node_ip1, node_ip1, grad2_E_ei_ei);
-    AddTo<T>(hessian, node_i, node_ip1, -grad2_E_ei_ei);
+    hessian->Insert(node_i, node_i, grad2_E_ei_ei);
+    hessian->Insert(node_ip1, node_ip1, grad2_E_ei_ei);
+    hessian->Insert(node_i, node_ip1, -grad2_E_ei_ei);
   }
 }
 
@@ -302,10 +209,10 @@ void AddTwistingEnergyJacobian(const DerStructuralProperty<T>& prop,
     T grad_E_twisti =
         (twist[i] - twist_undeformed[i]) * prop.GJ() / V_undeformed[i];
 
-    const int edge_i = 4 * i + 3;
-    const int edge_ip1 = 4 * ip1 + 3;
-    jacobian->coeffRef(edge_i) -= grad_E_twisti;
-    jacobian->coeffRef(edge_ip1) += grad_E_twisti;
+    const int dof_edge_i = 4 * i + 3;
+    const int dof_edge_ip1 = 4 * ip1 + 3;
+    jacobian->coeffRef(dof_edge_i) -= grad_E_twisti;
+    jacobian->coeffRef(dof_edge_ip1) += grad_E_twisti;
 
     // ∂τᵢ/∂eⁱ
     Vector3<T> grad_twisti_ei = 0.5 / l[i] * curvature.col(i);
@@ -317,13 +224,13 @@ void AddTwistingEnergyJacobian(const DerStructuralProperty<T>& prop,
     // ∂Eₜ/∂eⁱ⁺¹
     Vector3<T> grad_E_eip1 = grad_E_twisti * grad_twisti_eip1;
 
-    const int node_i = 4 * i;
-    const int node_ip1 = 4 * ((i + 1) % state.num_nodes());
-    const int node_ip2 = 4 * ((i + 2) % state.num_nodes());
-    jacobian->template segment<3>(node_i) -= grad_E_ei;
-    jacobian->template segment<3>(node_ip1) += grad_E_ei;
-    jacobian->template segment<3>(node_ip1) -= grad_E_eip1;
-    jacobian->template segment<3>(node_ip2) += grad_E_eip1;
+    const int dof_node_i = 4 * i;
+    const int dof_node_ip1 = 4 * ((i + 1) % state.num_nodes());
+    const int dof_node_ip2 = 4 * ((i + 2) % state.num_nodes());
+    jacobian->template segment<3>(dof_node_i) -= grad_E_ei;
+    jacobian->template segment<3>(dof_node_ip1) += grad_E_ei;
+    jacobian->template segment<3>(dof_node_ip1) -= grad_E_eip1;
+    jacobian->template segment<3>(dof_node_ip2) += grad_E_eip1;
   }
 }
 
@@ -331,7 +238,7 @@ template <typename T>
 void AddTwistingEnergyHessian(const DerStructuralProperty<T>& prop,
                               const DerUndeformedState<T>& undeformed,
                               const DerState<T>& state,
-                              Block4x4SparseSymmetricMatrix<T>* hessian) {
+                              EnergyHessianMatrix<T>* hessian) {
   DRAKE_THROW_UNLESS(hessian != nullptr);
 
   const auto& V_undeformed = undeformed.get_voronoi_length();
@@ -356,9 +263,9 @@ void AddTwistingEnergyHessian(const DerStructuralProperty<T>& prop,
 
     const DerEdgeIndex edge_i(i);
     const DerEdgeIndex edge_ip1((i + 1) % state.num_edges());
-    AddTo<T>(hessian, edge_i, edge_i, grad2_E_twisti_twisti);
-    AddTo<T>(hessian, edge_ip1, edge_ip1, grad2_E_twisti_twisti);
-    AddTo<T>(hessian, edge_i, edge_ip1, -grad2_E_twisti_twisti);
+    hessian->Insert(edge_i, edge_i, grad2_E_twisti_twisti);
+    hessian->Insert(edge_ip1, edge_ip1, grad2_E_twisti_twisti);
+    hessian->Insert(edge_i, edge_ip1, -grad2_E_twisti_twisti);
 
     // ∂τᵢ/∂eⁱ
     Vector3<T> grad_twisti_ei = 0.5 / l[i] * curvature.col(i);
@@ -399,19 +306,19 @@ void AddTwistingEnergyHessian(const DerStructuralProperty<T>& prop,
     const DerNodeIndex node_i(i);
     const DerNodeIndex node_ip1((i + 1) % state.num_nodes());
     const DerNodeIndex node_ip2((i + 2) % state.num_nodes());
-    AddTo<T>(hessian, node_i, node_i, grad2_E_ei_ei);
-    AddTo<T>(hessian, node_ip1, node_ip1, grad2_E_ei_ei);
-    AddTo<T>(hessian, node_i, node_ip1, -grad2_E_ei_ei);
+    hessian->Insert(node_i, node_i, grad2_E_ei_ei);
+    hessian->Insert(node_ip1, node_ip1, grad2_E_ei_ei);
+    hessian->Insert(node_i, node_ip1, -grad2_E_ei_ei);
 
-    AddTo<T>(hessian, node_ip1, node_ip1, grad2_E_eip1_eip1);
-    AddTo<T>(hessian, node_ip2, node_ip2, grad2_E_eip1_eip1);
-    AddTo<T>(hessian, node_ip1, node_ip2, -grad2_E_eip1_eip1);
+    hessian->Insert(node_ip1, node_ip1, grad2_E_eip1_eip1);
+    hessian->Insert(node_ip2, node_ip2, grad2_E_eip1_eip1);
+    hessian->Insert(node_ip1, node_ip2, -grad2_E_eip1_eip1);
 
-    AddTo<T>(hessian, node_i, node_ip1, grad2_E_ei_eip1);
-    AddTo<T>(hessian, node_ip1, node_ip2, grad2_E_ei_eip1);
-    AddTo<T>(hessian, node_i, node_ip2, -grad2_E_ei_eip1);
-    AddTo<T>(hessian, node_ip1, node_ip1,
-             -grad2_E_ei_eip1 - grad2_E_ei_eip1.transpose());
+    hessian->Insert(node_i, node_ip1, grad2_E_ei_eip1);
+    hessian->Insert(node_ip1, node_ip2, grad2_E_ei_eip1);
+    hessian->Insert(node_i, node_ip2, -grad2_E_ei_eip1);
+    hessian->Insert(node_ip1, node_ip1,
+                    -grad2_E_ei_eip1 - grad2_E_ei_eip1.transpose());
 
     // ∂²Eₜ/∂(eⁱ)(γⁱ)
     Vector3<T> grad2_E_ei_gammai = -grad2_E_twisti_twisti * grad_twisti_ei;
@@ -422,17 +329,17 @@ void AddTwistingEnergyHessian(const DerStructuralProperty<T>& prop,
     // ∂²Eₜ/∂(eⁱ⁺¹)(γⁱ⁺¹)
     Vector3<T> grad2_E_eip1_gammaip1 = grad2_E_twisti_twisti * grad_twisti_eip1;
 
-    AddTo<T>(hessian, node_i, edge_i, -grad2_E_ei_gammai);
-    AddTo<T>(hessian, node_ip1, edge_i, grad2_E_ei_gammai);
+    hessian->Insert(node_i, edge_i, -grad2_E_ei_gammai);
+    hessian->Insert(node_ip1, edge_i, grad2_E_ei_gammai);
 
-    AddTo<T>(hessian, node_i, edge_ip1, -grad2_E_ei_gammaip1);
-    AddTo<T>(hessian, node_ip1, edge_ip1, grad2_E_ei_gammaip1);
+    hessian->Insert(node_i, edge_ip1, -grad2_E_ei_gammaip1);
+    hessian->Insert(node_ip1, edge_ip1, grad2_E_ei_gammaip1);
 
-    AddTo<T>(hessian, node_ip1, edge_i, -grad2_E_eip1_gammai);
-    AddTo<T>(hessian, node_ip2, edge_i, grad2_E_eip1_gammai);
+    hessian->Insert(node_ip1, edge_i, -grad2_E_eip1_gammai);
+    hessian->Insert(node_ip2, edge_i, grad2_E_eip1_gammai);
 
-    AddTo<T>(hessian, node_ip1, edge_ip1, -grad2_E_eip1_gammaip1);
-    AddTo<T>(hessian, node_ip2, edge_ip1, grad2_E_eip1_gammaip1);
+    hessian->Insert(node_ip1, edge_ip1, -grad2_E_eip1_gammaip1);
+    hessian->Insert(node_ip2, edge_ip1, grad2_E_eip1_gammaip1);
   }
 }
 
@@ -520,13 +427,13 @@ void AddBendingEnergyJacobian(const DerStructuralProperty<T>& prop,
     Vector3<T> grad_E_eip1 =
         grad_E_kappa1i * grad_kappa1i_eip1 + grad_E_kappa2i * grad_kappa2i_eip1;
 
-    const int node_i = 4 * i;
-    const int node_ip1 = 4 * ((i + 1) % state.num_nodes());
-    const int node_ip2 = 4 * ((i + 2) % state.num_nodes());
-    jacobian->template segment<3>(node_i) -= grad_E_ei;
-    jacobian->template segment<3>(node_ip1) += grad_E_ei;
-    jacobian->template segment<3>(node_ip1) -= grad_E_eip1;
-    jacobian->template segment<3>(node_ip2) += grad_E_eip1;
+    const int dof_node_i = 4 * i;
+    const int dof_node_ip1 = 4 * ((i + 1) % state.num_nodes());
+    const int dof_node_ip2 = 4 * ((i + 2) % state.num_nodes());
+    jacobian->template segment<3>(dof_node_i) -= grad_E_ei;
+    jacobian->template segment<3>(dof_node_ip1) += grad_E_ei;
+    jacobian->template segment<3>(dof_node_ip1) -= grad_E_eip1;
+    jacobian->template segment<3>(dof_node_ip2) += grad_E_eip1;
 
     // ∂κ₁ᵢ/∂γⁱ
     T grad_kappa1i_gammai = -0.5 * m1.col(i).dot(curvature.col(i));
@@ -544,10 +451,10 @@ void AddBendingEnergyJacobian(const DerStructuralProperty<T>& prop,
     T grad_E_gammaip1 = grad_E_kappa1i * grad_kappa1i_gammaip1 +
                         grad_E_kappa2i * grad_kappa2i_gammaip1;
 
-    const int edge_i = 4 * i + 3;
-    const int edge_ip1 = 4 * ((i + 1) % state.num_edges()) + 3;
-    jacobian->coeffRef(edge_i) += grad_E_gammai;
-    jacobian->coeffRef(edge_ip1) += grad_E_gammaip1;
+    const int dof_edge_i = 4 * i + 3;
+    const int dof_edge_ip1 = 4 * ((i + 1) % state.num_edges()) + 3;
+    jacobian->coeffRef(dof_edge_i) += grad_E_gammai;
+    jacobian->coeffRef(dof_edge_ip1) += grad_E_gammaip1;
   }
 }
 
@@ -555,7 +462,7 @@ template <typename T>
 void AddBendingEnergyHessian(const DerStructuralProperty<T>& prop,
                              const DerUndeformedState<T>& undeformed,
                              const DerState<T>& state,
-                             Block4x4SparseSymmetricMatrix<T>* hessian) {
+                             EnergyHessianMatrix<T>* hessian) {
   DRAKE_THROW_UNLESS(hessian != nullptr);
 
   const auto& V_undeformed = undeformed.get_voronoi_length();
@@ -706,19 +613,19 @@ void AddBendingEnergyHessian(const DerStructuralProperty<T>& prop,
     const DerNodeIndex node_i(i);
     const DerNodeIndex node_ip1((i + 1) % state.num_nodes());
     const DerNodeIndex node_ip2((i + 2) % state.num_nodes());
-    AddTo<T>(hessian, node_i, node_i, grad2_E_ei_ei);
-    AddTo<T>(hessian, node_ip1, node_ip1, grad2_E_ei_ei);
-    AddTo<T>(hessian, node_i, node_ip1, -grad2_E_ei_ei);
+    hessian->Insert(node_i, node_i, grad2_E_ei_ei);
+    hessian->Insert(node_ip1, node_ip1, grad2_E_ei_ei);
+    hessian->Insert(node_i, node_ip1, -grad2_E_ei_ei);
 
-    AddTo<T>(hessian, node_ip1, node_ip1, grad2_E_eip1_eip1);
-    AddTo<T>(hessian, node_ip2, node_ip2, grad2_E_eip1_eip1);
-    AddTo<T>(hessian, node_ip1, node_ip2, -grad2_E_eip1_eip1);
+    hessian->Insert(node_ip1, node_ip1, grad2_E_eip1_eip1);
+    hessian->Insert(node_ip2, node_ip2, grad2_E_eip1_eip1);
+    hessian->Insert(node_ip1, node_ip2, -grad2_E_eip1_eip1);
 
-    AddTo<T>(hessian, node_i, node_ip1, grad2_E_ei_eip1);
-    AddTo<T>(hessian, node_ip1, node_ip2, grad2_E_ei_eip1);
-    AddTo<T>(hessian, node_i, node_ip2, -grad2_E_ei_eip1);
-    AddTo<T>(hessian, node_ip1, node_ip1,
-             -grad2_E_ei_eip1 - grad2_E_ei_eip1.transpose());
+    hessian->Insert(node_i, node_ip1, grad2_E_ei_eip1);
+    hessian->Insert(node_ip1, node_ip2, grad2_E_ei_eip1);
+    hessian->Insert(node_i, node_ip2, -grad2_E_ei_eip1);
+    hessian->Insert(node_ip1, node_ip1,
+                    -grad2_E_ei_eip1 - grad2_E_ei_eip1.transpose());
 
     // ∂κ₁ᵢ/∂γⁱ
     T grad_kappa1i_gammai = -0.5 * m1.col(i).dot(curvature.col(i));
@@ -761,9 +668,9 @@ void AddBendingEnergyHessian(const DerStructuralProperty<T>& prop,
 
     const DerEdgeIndex edge_i(i);
     const DerEdgeIndex edge_ip1((i + 1) % state.num_edges());
-    AddTo<T>(hessian, edge_i, edge_i, grad2_E_gammai_gammai);
-    AddTo<T>(hessian, edge_ip1, edge_ip1, grad2_E_gammaip1_gammaip1);
-    AddTo<T>(hessian, edge_i, edge_ip1, grad2_E_gammai_gammaip1);
+    hessian->Insert(edge_i, edge_i, grad2_E_gammai_gammai);
+    hessian->Insert(edge_ip1, edge_ip1, grad2_E_gammaip1_gammaip1);
+    hessian->Insert(edge_i, edge_ip1, grad2_E_gammai_gammaip1);
 
     // ∂²κ₁ᵢ/∂(eⁱ)(γⁱ)
     Vector3<T> grad2_kappa1i_ei_gammai =
@@ -831,23 +738,23 @@ void AddBendingEnergyHessian(const DerStructuralProperty<T>& prop,
         grad2_E_kappa2i_kappa2i * grad_kappa2i_eip1 * grad_kappa2i_gammaip1 +
         grad_E_kappa2i * grad2_kappa2i_eip1_gammaip1;
 
-    AddTo<T>(hessian, node_i, edge_i, -grad2_E_ei_gammai);
-    AddTo<T>(hessian, node_ip1, edge_i, grad2_E_ei_gammai);
+    hessian->Insert(node_i, edge_i, -grad2_E_ei_gammai);
+    hessian->Insert(node_ip1, edge_i, grad2_E_ei_gammai);
 
-    AddTo<T>(hessian, node_i, edge_ip1, -grad2_E_ei_gammaip1);
-    AddTo<T>(hessian, node_ip1, edge_ip1, grad2_E_ei_gammaip1);
+    hessian->Insert(node_i, edge_ip1, -grad2_E_ei_gammaip1);
+    hessian->Insert(node_ip1, edge_ip1, grad2_E_ei_gammaip1);
 
-    AddTo<T>(hessian, node_ip1, edge_i, -grad2_E_eip1_gammai);
-    AddTo<T>(hessian, node_ip2, edge_i, grad2_E_eip1_gammai);
+    hessian->Insert(node_ip1, edge_i, -grad2_E_eip1_gammai);
+    hessian->Insert(node_ip2, edge_i, grad2_E_eip1_gammai);
 
-    AddTo<T>(hessian, node_ip1, edge_ip1, -grad2_E_eip1_gammaip1);
-    AddTo<T>(hessian, node_ip2, edge_ip1, grad2_E_eip1_gammaip1);
+    hessian->Insert(node_ip1, edge_ip1, -grad2_E_eip1_gammaip1);
+    hessian->Insert(node_ip2, edge_ip1, grad2_E_eip1_gammaip1);
   }
 }
 
 DRAKE_DEFINE_FUNCTION_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
     (&ComputeElasticEnergy<T>, &ComputeElasticEnergyJacobian<T>,
-     &ComputeElasticEnergyHessian<T>, &MakeElasticEnergyHessianMatrix<T>));
+     &ComputeElasticEnergyHessian<T>));
 
 }  // namespace internal
 }  // namespace der
