@@ -140,6 +140,11 @@ SchurComplement<T> ComputeSchurComplement(
     const Block4x4SparseSymmetricMatrix<T>& mat,
     const std::unordered_set<int> participating_dofs);
 
+/* Converts a Block4x4SparseSymmetricMatrix to the lower part of an
+ Eigen::SparseMatrix.  */
+template <typename T>
+Eigen::SparseMatrix<T> Convert(const Block4x4SparseSymmetricMatrix<T>& mat);
+
 }  // namespace internal
 }  // namespace der
 }  // namespace multibody

@@ -161,6 +161,16 @@ TEST_P(EnergyHessianMatrixUtilTest, ComputeSchurComplement) {
                               A - B * D.inverse() * B.transpose(), 1e-12));
 }
 
+TEST_P(EnergyHessianMatrixUtilTest, Convert) {
+  const Block4x4SparseSymmetricMatrix<double> block4x4_sparse =
+      MakeRandomMatrix();
+  const Eigen::SparseMatrix<double> eigen_sparse = Convert(block4x4_sparse);
+  EXPECT_TRUE(CompareMatrices(
+      MatrixXd(eigen_sparse.toDense().triangularView<Eigen::Lower>()),
+      MatrixXd(
+          block4x4_sparse.MakeDenseMatrix().triangularView<Eigen::Lower>())));
+}
+
 }  // namespace
 }  // namespace internal
 }  // namespace der

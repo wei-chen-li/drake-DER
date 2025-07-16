@@ -247,6 +247,35 @@ SchurComplement<T> ComputeSchurComplement(
   return SchurComplement<T>(A, Bt, D);
 }
 
+template <typename T>
+Eigen::SparseMatrix<T> Convert(const Block4x4SparseSymmetricMatrix<T>& mat) {
+  std::vector<int> reserve_sizes;
+  reserve_sizes.reserve(mat.cols());
+  for (int block_j = 0; block_j < mat.block_cols(); ++block_j) {
+    for (int v = 0; v < 4; ++v) {
+      reserve_sizes.push_back(
+          mat.sparsity_pattern().neighbors()[block_j].size() * 4);
+    }
+  }
+
+  Eigen::SparseMatrix<T> result(mat.rows(), mat.cols());
+  result.reserve(reserve_sizes);
+  for (int block_j = 0; block_j < mat.block_cols(); ++block_j) {
+    for (int v = 0; v < 4; ++v) {
+      const int j = 4 * block_j + v;
+      for (int block_i : mat.sparsity_pattern().neighbors()[block_j]) {
+        // block_i ≥ block_j
+        const Matrix4<T>& block = mat.block(block_i, block_j);
+        for (int u = 0; u < 4; ++u) {
+          const int i = 4 * block_i + u;
+          result.insert(i, j) = block(u, v);
+        }
+      }
+    }
+  }
+  return result;
+}
+
 DRAKE_DEFINE_FUNCTION_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
     (static_cast<void (*)(Block4x4SparseSymmetricMatrix<T>*,
                           const Eigen::DiagonalMatrix<T, Eigen::Dynamic>&,
@@ -254,7 +283,7 @@ DRAKE_DEFINE_FUNCTION_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
      static_cast<void (*)(Block4x4SparseSymmetricMatrix<T>*,
                           const Block4x4SparseSymmetricMatrix<T>&,  //
                           const T&)>(&AddScaledMatrix<T>),
-     &SumMatrices<T>));
+     &SumMatrices<T>, &Convert<T>));
 
 DRAKE_DEFINE_FUNCTION_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_NONSYMBOLIC_SCALARS(
     (&ComputeSchurComplement<T>));
