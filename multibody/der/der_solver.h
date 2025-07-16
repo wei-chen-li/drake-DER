@@ -122,7 +122,6 @@ class DerSolver {
                     typename DerModel<T>::ScratchDeleter>
         der_model_scratch;
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<T>, Eigen::Lower> linear_solver;
-    bool prev_is_contact_energy_enabled;
     Eigen::VectorX<T> b;
   } scratch_;
 };

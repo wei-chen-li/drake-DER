@@ -20,7 +20,6 @@ DerSolver<T>::DerSolver(const DerModel<T>* model,
   const Block4x4SparseSymmetricMatrix<T>& A = model_->ComputeTangentMatrix(
       *state_, integrator_->GetWeights(), scratch_.der_model_scratch.get());
   scratch_.linear_solver.analyzePattern(Convert(A));
-  scratch_.prev_is_contact_energy_enabled = model_->IsContactEnergyEnabled();
   /* Set b to size that matches the tangent matrix. */
   scratch_.b = Eigen::VectorX<T>::Zero(A.rows());
 }
@@ -62,16 +61,7 @@ int DerSolver<T>::AdvanceOneTimeStep(
                                      der_model_scratch);
     /* If the contact energy is not enabled, the sparsity pattern of the tangent
      matrix does not change and thus we call UpdateMatrix(). */
-    if (!model_->IsContactEnergyEnabled()) {
-      if (scratch_.prev_is_contact_energy_enabled)
-        linear_solver.compute(Convert(tangent_matrix));
-      else
-        linear_solver.factorize(Convert(tangent_matrix));
-      scratch_.prev_is_contact_energy_enabled = false;
-    } else {
-      linear_solver.compute(Convert(tangent_matrix));
-      scratch_.prev_is_contact_energy_enabled = true;
-    }
+    linear_solver.factorize(Convert(tangent_matrix));
     DRAKE_DEMAND(linear_solver.info() == Eigen::Success);
     auto dz = linear_solver.solve(b).head(num_dofs);
     DRAKE_DEMAND(linear_solver.info() == Eigen::Success);
