@@ -30,6 +30,7 @@ drake_cc_package_library(
         ":elastic_energy",
         ":energy_hessian_matrix_utility",
         ":external_force_field",
+        ":schur_complement",
         ":velocity_newmark_scheme",
     ],
 )
@@ -194,10 +195,10 @@ drake_cc_library(
     srcs = ["energy_hessian_matrix_utility.cc"],
     hdrs = ["energy_hessian_matrix_utility.h"],
     deps = [
+        ":schur_complement",
         "//common:default_scalars",
         "//multibody/contact_solvers:block_sparse_lower_triangular_or_symmetric_matrix",  # noqa
         "//multibody/contact_solvers/sap:partial_permutation",
-        "//multibody/fem:schur_complement",
     ],
 )
 
@@ -210,6 +211,15 @@ drake_cc_library(
         ":der_structural_property",
         ":der_undeformed_state",
         "//multibody/fem:force_density_field_base",
+    ],
+)
+
+drake_cc_library(
+    name = "schur_complement",
+    srcs = ["schur_complement.cc"],
+    hdrs = ["schur_complement.h"],
+    deps = [
+        "//common:default_scalars",
     ],
 )
 
@@ -355,6 +365,14 @@ drake_cc_googletest(
         "//common/test_utilities:eigen_matrix_compare",
         "//common/test_utilities:limit_malloc",
         "//multibody/tree",
+    ],
+)
+
+drake_cc_googletest(
+    name = "schur_complement_test",
+    deps = [
+        ":schur_complement",
+        "//common/test_utilities:eigen_matrix_compare",
     ],
 )
 

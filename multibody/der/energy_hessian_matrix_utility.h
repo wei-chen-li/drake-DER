@@ -3,7 +3,7 @@
 #include <unordered_set>
 
 #include "drake/multibody/contact_solvers/block_sparse_lower_triangular_or_symmetric_matrix.h"
-#include "drake/multibody/fem/schur_complement.h"
+#include "drake/multibody/der/schur_complement.h"
 
 namespace drake {
 namespace multibody {
@@ -11,7 +11,6 @@ namespace der {
 namespace internal {
 
 using contact_solvers::internal::Block4x4SparseSymmetricMatrix;
-using multibody::fem::internal::SchurComplement;
 
 /* Forward declaration. */
 template <typename T>
