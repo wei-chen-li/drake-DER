@@ -121,8 +121,7 @@ class DerSolver {
     std::unique_ptr<typename DerModel<T>::Scratch,
                     typename DerModel<T>::ScratchDeleter>
         der_model_scratch;
-    contact_solvers::internal::BlockSparseCholeskySolver<Matrix4<T>>
-        linear_solver;
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<T>, Eigen::Lower> linear_solver;
     bool prev_is_contact_energy_enabled;
     Eigen::VectorX<T> b;
   } scratch_;

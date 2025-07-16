@@ -16,10 +16,10 @@ DerSolver<T>::DerSolver(const DerModel<T>* model,
   state_ = model_->CreateDerState();
   /* Allocate the scratch for the DerModel. */
   scratch_.der_model_scratch = model_->MakeScratch();
-  /* Tell BlockSparseCholeskySolver the block sparsity pattern. */
+  /* Tell SimplicialLDLT the sparsity pattern. */
   const Block4x4SparseSymmetricMatrix<T>& A = model_->ComputeTangentMatrix(
       *state_, integrator_->GetWeights(), scratch_.der_model_scratch.get());
-  scratch_.linear_solver.SetMatrix(A);
+  scratch_.linear_solver.analyzePattern(Convert(A));
   scratch_.prev_is_contact_energy_enabled = model_->IsContactEnergyEnabled();
   /* Set b to size that matches the tangent matrix. */
   scratch_.b = Eigen::VectorX<T>::Zero(A.rows());
@@ -34,8 +34,8 @@ int DerSolver<T>::AdvanceOneTimeStep(
   DerState<T>& state = *state_;
   typename DerModel<T>::Scratch* der_model_scratch =
       scratch_.der_model_scratch.get();
-  contact_solvers::internal::BlockSparseCholeskySolver<Matrix4<T>>&
-      linear_solver = scratch_.linear_solver;
+  Eigen::SimplicialLDLT<Eigen::SparseMatrix<T>, Eigen::Lower>& linear_solver =
+      scratch_.linear_solver;
   Eigen::VectorX<T>& b = scratch_.b;
   const int num_dofs = model_->num_dofs();
   DRAKE_DEMAND(der_model_scratch != nullptr);
@@ -64,24 +64,17 @@ int DerSolver<T>::AdvanceOneTimeStep(
      matrix does not change and thus we call UpdateMatrix(). */
     if (!model_->IsContactEnergyEnabled()) {
       if (scratch_.prev_is_contact_energy_enabled)
-        linear_solver.SetMatrix(tangent_matrix);
+        linear_solver.compute(Convert(tangent_matrix));
       else
-        linear_solver.UpdateMatrix(tangent_matrix);
+        linear_solver.factorize(Convert(tangent_matrix));
       scratch_.prev_is_contact_energy_enabled = false;
     } else {
-      linear_solver.SetMatrix(tangent_matrix);
+      linear_solver.compute(Convert(tangent_matrix));
       scratch_.prev_is_contact_energy_enabled = true;
     }
-    const bool factored = linear_solver.Factor();
-    if (!factored) {
-      throw std::runtime_error(
-          "Tangent matrix factorization failed in DerSolver because the DER "
-          "tangent matrix is not symmetric positive definite. This may be "
-          "triggered by a combination of a stiff constitutive model and a "
-          "large timestep.");
-    }
-    linear_solver.SolveInPlace(&b);
-    auto dz = b.head(num_dofs);
+    DRAKE_DEMAND(linear_solver.info() == Eigen::Success);
+    auto dz = linear_solver.solve(b).head(num_dofs);
+    DRAKE_DEMAND(linear_solver.info() == Eigen::Success);
     integrator_->AdjustStateFromChangeInUnknowns(dz, &state);
     b.head(num_dofs) = -model_->ComputeResidual(state, external_force_field,
                                                 der_model_scratch);
