@@ -108,16 +108,6 @@ DerModel<double>& RegisterCantileverBeam(
   return deformable_model->GetMutableBody(body_id).mutable_der_model();
 }
 
-void SetUniformUndeformedCurvature(DerModel<double>* der_model, double angle) {
-  DRAKE_THROW_UNLESS(der_model != nullptr);
-  const int num_internal_nodes =
-      der_model->mutable_undeformed_state().num_internal_nodes();
-  const auto kappa =
-      Eigen::RowVectorXd::Ones(num_internal_nodes) * (2 * tan(angle / 2));
-  const auto zero = Eigen::RowVectorXd::Zero(num_internal_nodes);
-  der_model->mutable_undeformed_state().set_curvature_kappa(zero, kappa);
-}
-
 int do_main() {
   systems::DiagramBuilder<double> builder;
 
@@ -144,7 +134,11 @@ int do_main() {
   for (int i = 0; i <= i_max; ++i) {
     simulator.AdvanceTo(FLAGS_time_step * i);
     const double angle = M_PI / FLAGS_num_edges * i / i_max;
-    SetUniformUndeformedCurvature(&der_model, angle);
+    auto& undeformed = der_model.mutable_undeformed_state();
+    const int num_internal_nodes = undeformed.num_internal_nodes();
+    undeformed.set_curvature_angle(
+        Eigen::RowVectorXd::Zero(num_internal_nodes),
+        Eigen::RowVectorXd::Constant(num_internal_nodes, angle));
   }
 
   return 0;

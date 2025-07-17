@@ -65,6 +65,20 @@ void DerUndeformedState<T>::set_curvature_kappa(
 }
 
 template <typename T>
+void DerUndeformedState<T>::set_curvature_angle(
+    const Eigen::Ref<const Eigen::RowVectorX<T>>& angle1,
+    const Eigen::Ref<const Eigen::RowVectorX<T>>& angle2) {
+  DRAKE_THROW_UNLESS(angle1.size() == num_internal_nodes());
+  DRAKE_THROW_UNLESS(angle1.size() == num_internal_nodes());
+  DRAKE_THROW_UNLESS((-2 * M_PI < angle1.array()).all());
+  DRAKE_THROW_UNLESS((2 * M_PI > angle1.array()).all());
+  DRAKE_THROW_UNLESS((-2 * M_PI < angle2.array()).all());
+  DRAKE_THROW_UNLESS((2 * M_PI > angle2.array()).all());
+  kappa1_ = 2.0 * tan(angle1.array() / 2.0);
+  kappa2_ = 2.0 * tan(angle2.array() / 2.0);
+}
+
+template <typename T>
 void DerUndeformedState<T>::set_twist(
     const Eigen::Ref<const Eigen::RowVectorX<T>>& twist) {
   DRAKE_THROW_UNLESS(twist.size() == num_internal_nodes());

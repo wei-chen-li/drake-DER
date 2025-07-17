@@ -79,12 +79,21 @@ class DerUndeformedState {
   void set_edge_length(
       const Eigen::Ref<const Eigen::RowVectorX<T>>& edge_length);
 
-  /** Sets the undeformed curvature components.
+  /** Sets the undeformed curvature components from the kappa values.
    @pre `kappa1.size() == num_internal_nodes()`.
    @pre `kappa2.size() == num_internal_nodes()`. */
   void set_curvature_kappa(
       const Eigen::Ref<const Eigen::RowVectorX<T>>& kappa1,
       const Eigen::Ref<const Eigen::RowVectorX<T>>& kappa2);
+
+  /** Sets the undeformed curvature components from the angle values.
+   Equivalent to `set_curvature_kappa(2*tan(angle1/2), 2*tan(angle2/2))`
+   @pre `angle1.size() == num_internal_nodes()`.
+   @pre `angle1.size() == num_internal_nodes()`.
+   @pre Entries in `angle1` and `angle2` are all within the range (-2π, 2π). */
+  void set_curvature_angle(
+      const Eigen::Ref<const Eigen::RowVectorX<T>>& angle1,
+      const Eigen::Ref<const Eigen::RowVectorX<T>>& angle2);
 
   /** Sets the undeformed twist.
    @pre `twist.size() == num_internal_nodes()`. */

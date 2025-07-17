@@ -48,6 +48,9 @@ void DoScalarDependentDefinitions(py::module m, T) {
         .def("set_curvature_kappa", &Class::set_curvature_kappa,
             py::arg("kappa1"), py::arg("kappa2"),
             cls_doc.set_curvature_kappa.doc)
+        .def("set_curvature_angle", &Class::set_curvature_angle,
+            py::arg("angle1"), py::arg("angle2"),
+            cls_doc.set_curvature_angle.doc)
         .def("set_twist", &Class::set_twist, py::arg("twist"),
             cls_doc.set_twist.doc);
     DefCopyAndDeepCopy(&cls);
