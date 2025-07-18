@@ -494,9 +494,18 @@ void DerStateSystem<T>::CopyContext(const systems::Context<T>& from_context,
   this->ValidateContext(to_context);
   if (&from_context == to_context) return;
 
-  /* Copy the discrete state vectors representing the position, velocity, and
-   acceleration, as well as the abstract state holding previous step data. */
+  /* Record the serial number of `to_context`  */
+  const int64_t to_context_serial_number = serial_number(*to_context);
+
+  /* Copy the discrete state vectors representing the position, velocity,
+   and acceleration, as well as the abstract state holding previous step
+   data. */
   to_context->SetTimeStateAndParametersFrom(from_context);
+
+  /* Write the serial number back to `to_context` and increment it by one. */
+  to_context->get_mutable_abstract_parameter(serial_number_index_)
+      .set_value(to_context_serial_number);
+  increment_serial_number(to_context);
 
   /* Copy the cache entry values that are up-to-date to avoid recalculation when
    the `to_context` is later used. */

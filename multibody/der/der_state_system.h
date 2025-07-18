@@ -203,8 +203,7 @@ class DerStateSystem final : public systems::LeafSystem<T> {
   }
   // @}
 
-  /* Performs deep copying from `from_context` into `to_context` including the
-   serial number.
+  /* Performs deep copying from `from_context` into `to_context`.
    @pre `to_context != nullptr`.
    @pre Both context are created from this system. */
   void CopyContext(const systems::Context<T>& from_context,

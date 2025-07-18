@@ -268,18 +268,16 @@ TYPED_TEST(DerStateSystemTest, SerialNumber) {
   EXPECT_EQ(system.serial_number(context), 6);
   system.get_mutable_acceleration(&context);
   EXPECT_EQ(system.serial_number(context), 7);
-  system.Deserialize(&context, system.Serialize(context));
+  system.CopyContext(*system.CreateDefaultContext(), &context);
   EXPECT_EQ(system.serial_number(context), 8);
-  system.Transform(&context, math::RigidTransform<T>());
+  system.Deserialize(&context, system.Serialize(context));
   EXPECT_EQ(system.serial_number(context), 9);
+  system.Transform(&context, math::RigidTransform<T>());
+  EXPECT_EQ(system.serial_number(context), 10);
   if constexpr (std::is_same_v<T, AutoDiffXd>) {
     system.FixReferenceFrameDuringAutoDiff(&context);
-    EXPECT_EQ(system.serial_number(context), 10);
+    EXPECT_EQ(system.serial_number(context), 11);
   }
-
-  auto context2 = system.CreateDefaultContext();
-  system.CopyContext(context, context2.get());
-  EXPECT_EQ(system.serial_number(*context2), system.serial_number(context));
 }
 
 }  // namespace
