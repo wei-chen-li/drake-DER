@@ -17,48 +17,46 @@ using Eigen::Vector3d;
 using Eigen::VectorXd;
 using test::LimitMalloc;
 
-constexpr double kDt = 1e-3;
-constexpr double kGamma = 0.6;
-constexpr double kBeta = 0.3;
-constexpr double kTolerance = 16.0 * std::numeric_limits<double>::epsilon();
-
-class AccelerationNewmarkSchemeTest : public ::testing::Test {
+class AccelerationNewmarkSchemeTest : public ::testing::TestWithParam<double> {
  protected:
   void SetUp() {
     bool has_closed_ends = false;
-
-    std::vector<Vector3d> node_positions(3);
-    node_positions[0] = Eigen::Vector3d(0, 0, 0);
-    node_positions[1] = Eigen::Vector3d(1, 0, 0);
-    node_positions[2] = Eigen::Vector3d(2, 1, 0);
-
+    std::vector<Vector3d> node_positions = {
+        Vector3d(0, 0, 0), Vector3d(1, 0, 0), Vector3d(2, 1, 0)};
     std::vector<double> edge_angles = {M_PI / 6, M_PI / 6};
-
-    Eigen::Vector3d d1_0(0, 1, 0);
-
     der_state_system_ = std::make_unique<DerStateSystem<double>>(
-        has_closed_ends, node_positions, edge_angles, d1_0);
+        has_closed_ends, node_positions, edge_angles, std::nullopt);
+
+    scheme_.set_dt(kDt);
   }
 
-  const AccelerationNewmarkScheme<double> scheme_{kDt, kGamma, kBeta};
+  const double kDt = GetParam();
+  const double kGamma = 0.6;
+  const double kBeta = 0.3;
+  const double kTolerance = 16.0 * std::numeric_limits<double>::epsilon();
+
+  AccelerationNewmarkScheme<double> scheme_{kDt, kGamma, kBeta};
   std::unique_ptr<DerStateSystem<double>> der_state_system_;
 };
 
+INSTANTIATE_TEST_SUITE_P(TimeStep, AccelerationNewmarkSchemeTest,
+                         ::testing::Values(1e-3, 1e-4));
+
 /* Verify that the weights returned by the accessor match expectation. */
-TEST_F(AccelerationNewmarkSchemeTest, Weights) {
+TEST_P(AccelerationNewmarkSchemeTest, Weights) {
   EXPECT_EQ(scheme_.GetWeights(),
             (std::array<double, 3>{kBeta * kDt * kDt, kGamma * kDt, 1.0}));
 }
 
 /* Verify that the unknowns are the accelerations. */
-TEST_F(AccelerationNewmarkSchemeTest, Unknowns) {
+TEST_P(AccelerationNewmarkSchemeTest, Unknowns) {
   const DerState<double> state(der_state_system_.get());
   EXPECT_EQ(&scheme_.GetUnknowns(state), &state.get_acceleration());
 }
 
 /* Tests that AccelerationNewmarkScheme reproduces analytical solutions with
  constant acceleration. */
-TEST_F(AccelerationNewmarkSchemeTest, AdvanceOneTimeStep) {
+TEST_P(AccelerationNewmarkSchemeTest, AdvanceDt) {
   DerState<double> state_n(der_state_system_.get());
   const VectorXd a = VectorXd::LinSpaced(state_n.num_dofs(), 0.0, 1.0);
   state_n.SetAcceleration(a);
@@ -67,7 +65,7 @@ TEST_F(AccelerationNewmarkSchemeTest, AdvanceOneTimeStep) {
   for (int i = 0; i < kTimeSteps; ++i) {
     DerState<double> state_np1(der_state_system_.get());
     LimitMalloc guard;
-    scheme_.AdvanceOneTimeStep(state_n, a, &state_np1);
+    scheme_.AdvanceDt(state_n, a, &state_np1);
     state_n.CopyFrom(state_np1);
   }
 
@@ -84,14 +82,14 @@ TEST_F(AccelerationNewmarkSchemeTest, AdvanceOneTimeStep) {
                               kTimeSteps * kTolerance));
 
   /* If `state->CopyFrom(prev_state);` is not called within
-   AccelerationNewmarkScheme::AdvanceOneTimeStep(), the following EXPECT_EQs
+   AccelerationNewmarkScheme::AdvanceDt(), the following EXPECT_EQs
    will fail. */
   DerState<double> state_n_expected(der_state_system_.get());
   state_n_expected.SetAcceleration(a);
   DerState<double> state_np1(der_state_system_.get());
   for (int i = 0; i < kTimeSteps; ++i) {
     LimitMalloc guard;
-    scheme_.AdvanceOneTimeStep(state_n_expected, a, &state_np1);
+    scheme_.AdvanceDt(state_n_expected, a, &state_np1);
     state_n_expected.CopyFrom(state_np1);
   }
   EXPECT_EQ(state_n.get_reference_frame_d1(),
@@ -101,7 +99,7 @@ TEST_F(AccelerationNewmarkSchemeTest, AdvanceOneTimeStep) {
 
 /* Verify that the result of AdjustStateFromChangeInUnknowns() is consistent
  with the weights. */
-TEST_F(AccelerationNewmarkSchemeTest, AdjustStateFromChangeInUnknowns) {
+TEST_P(AccelerationNewmarkSchemeTest, AdjustStateFromChangeInUnknowns) {
   const DerState<double> state0(der_state_system_.get());
   DerState<double> state(der_state_system_.get());
   const VectorXd dz = VectorXd::LinSpaced(state.num_dofs(), 0.0, 1.0);
@@ -124,15 +122,15 @@ TEST_F(AccelerationNewmarkSchemeTest, AdjustStateFromChangeInUnknowns) {
  `VelocityNewmarkScheme` by advancing one time step with each integration
  scheme using the same initial state and verifying that the resulting new
  states are the same. */
-TEST_F(AccelerationNewmarkSchemeTest, EquivalenceWithVelocityNewmark) {
+TEST_P(AccelerationNewmarkSchemeTest, EquivalenceWithVelocityNewmark) {
   const DerState<double> state0(der_state_system_.get());
   DerState<double> state_a(der_state_system_.get());
   const VectorXd a = VectorXd::LinSpaced(state0.num_dofs(), 0.0, 1.0);
-  scheme_.AdvanceOneTimeStep(state0, a, &state_a);
+  scheme_.AdvanceDt(state0, a, &state_a);
 
   const VelocityNewmarkScheme<double> velocity_scheme{kDt, kGamma, kBeta};
   DerState<double> state_v(der_state_system_.get());
-  velocity_scheme.AdvanceOneTimeStep(state0, state_a.get_velocity(), &state_v);
+  velocity_scheme.AdvanceDt(state0, state_a.get_velocity(), &state_v);
 
   /* Set a larger error tolerance to accommodate the division by `dt` used in
    the VelocityNewmarkScheme. */

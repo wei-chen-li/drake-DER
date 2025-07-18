@@ -10,8 +10,8 @@ VelocityNewmarkScheme<T>::VelocityNewmarkScheme(double dt, double gamma,
                                                 double beta)
     : DiscreteTimeIntegrator<T>(dt),
       gamma_(gamma),
-      beta_over_gamma_(beta / gamma),
-      one_over_dt_gamma_(1.0 / (dt * gamma)) {
+      one_over_gamma_(1.0 / gamma),
+      beta_over_gamma_(beta * one_over_gamma_) {
   DRAKE_DEMAND(0.5 <= gamma && gamma <= 1);
   DRAKE_DEMAND(0 <= beta && beta <= 0.5);
 }
@@ -29,11 +29,11 @@ std::unique_ptr<DiscreteTimeIntegrator<T>> VelocityNewmarkScheme<T>::DoClone()
 template <typename T>
 std::array<T, 3> VelocityNewmarkScheme<T>::DoGetWeights() const {
   const double dt = this->dt();
-  return {beta_over_gamma_ * dt, 1.0, one_over_dt_gamma_};
+  return {beta_over_gamma_ * dt, 1.0, one_over_gamma_ / dt};
 }
 
 template <typename T>
-void VelocityNewmarkScheme<T>::DoAdvanceOneTimeStep(
+void VelocityNewmarkScheme<T>::DoAdvanceDt(
     const DerState<T>& prev_state, const Eigen::Ref<const Eigen::VectorX<T>>& z,
     DerState<T>* state) const {
   const double dt = this->dt();
@@ -50,7 +50,7 @@ void VelocityNewmarkScheme<T>::DoAdvanceOneTimeStep(
   state->AdvancePositionToNextStep(
       qn + dt * (beta_over_gamma_ * v + (1.0 - beta_over_gamma_) * vn) +
       dt * dt * (0.5 - beta_over_gamma_) * an);
-  state->SetAcceleration(one_over_dt_gamma_ * (v - vn) -
+  state->SetAcceleration(one_over_gamma_ / dt * (v - vn) -
                          (1.0 - gamma_) / gamma_ * an);
   state->SetVelocity(v);
 }

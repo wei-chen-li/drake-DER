@@ -213,7 +213,7 @@ void DeformableDriver<T>::DeclareCacheEntries(
           dof_permutation_cache_entry.cache_index());
 
       DerSolver<T> model_der_solver(&der_model,
-                                    &deformable_model_->der_integrator());
+                                    deformable_model_->der_integrator());
       /* Cache entry for free motion DER state and data. */
       const auto& der_solver_cache_entry = manager->DeclareCacheEntry(
           fmt::format("DER solver and data for body with index {}", i),
@@ -1764,8 +1764,10 @@ void DeformableDriver<T>::CalcNextDerState(const systems::Context<T>& context,
     VectorX<T>& v_next = dv;
     v_next += EvalFreeMotionDerState(context, index).get_velocity();
     const DerState<T>& der_state = EvalDerState(context, index);
-    deformable_model_->der_integrator().AdvanceOneTimeStep(der_state, v_next,
-                                                           next_der_state);
+    DRAKE_DEMAND(deformable_model_->der_integrator().dt() ==
+                 manager_->plant().time_step());
+    deformable_model_->der_integrator().AdvanceDt(der_state, v_next,
+                                                  next_der_state);
   }
 }
 

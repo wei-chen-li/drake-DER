@@ -30,7 +30,7 @@ std::array<T, 3> AccelerationNewmarkScheme<T>::DoGetWeights() const {
 }
 
 template <typename T>
-void AccelerationNewmarkScheme<T>::DoAdvanceOneTimeStep(
+void AccelerationNewmarkScheme<T>::DoAdvanceDt(
     const DerState<T>& prev_state, const Eigen::Ref<const Eigen::VectorX<T>>& z,
     DerState<T>* state) const {
   const double dt = this->dt();

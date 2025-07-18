@@ -35,7 +35,7 @@ class DerSolver {
    @pre `model != nullptr`.
    @pre `integrator != nullptr`. */
   DerSolver(const DerModel<T>* model,
-            const DiscreteTimeIntegrator<T>* integrator);
+            const DiscreteTimeIntegrator<T>& integrator);
 
   /* Advances `prev_state` by one time step to the internally owned DerState
    so that M q̈ - Fᵢₙₜ(q, q̇) - Fₑₓₜ ≈ 0 is satisfied at the new time step.
@@ -92,6 +92,12 @@ class DerSolver {
   /* Friend class to facilitate testing. */
   friend class DerSolverTester;
 
+  /* Advances `prev_state` by `dt` to the internally owned DerState.
+   Returns the number of iterations the solver takes to converge. If the solver
+   fails to converge, returns -1. */
+  int AdvanceDt(const DerState<T>& prev_state, double dt,
+                const ExternalForceField<T>& external_force_field);
+
   /* Scales the edge angle DoFs of `residual`, which has unit N⋅m, by the
    inverse of a characteric radius so that all entries have unit N. Then returns
    the 2-norm of the unit adjusted vector. */
@@ -105,18 +111,23 @@ class DerSolver {
 
   /* Pointer to DerModel and DiscreteTimeIntegrator set at construction. */
   const DerModel<T>* const model_{};
-  const DiscreteTimeIntegrator<T>* const integrator_{};
+  copyable_unique_ptr<DiscreteTimeIntegrator<T>> integrator_;
   /* Owned DerState. */
   copyable_unique_ptr<internal::DerState<T>> state_;
   /* Owned SchurComplement */
   SchurComplement<T> tangent_matrix_schur_complement_;
+  /* Max and min time step and the currently used time step. */
+  const double dt_max_{};
+  const double dt_min_{};
+  double dt_;
   /* Tolerance for convergence. */
   double relative_tolerance_{1e-4};  // unitless.
   double absolute_tolerance_{1e-6};  // unit N.
   /* Max number of Newton-Raphson iterations before giving up. */
-  int max_iterations_{100};
+  int max_newton_iters_{20};
   /* Instance of struct holding preallocated memory. */
   struct Scratch {
+    std::unique_ptr<DerState<T>> prev_state;
     std::unique_ptr<typename DerModel<T>::Scratch,
                     typename DerModel<T>::ScratchDeleter>
         der_model_scratch;

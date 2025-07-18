@@ -62,19 +62,20 @@ class DiscreteTimeIntegrator {
   /* Extracts the unknown variable `z` from the given DER `state`. */
   const Eigen::VectorX<T>& GetUnknowns(const DerState<T>& state) const;
 
-  /* Advances `prev_state` by one time step to the `state` with the given value
-   of the unknown variable z.
+  /* Advances `prev_state` by dt() to the `state` with the given value of the
+   unknown variable `z`.
 
    @param[in]  prev_state  The state at the previous time step. Need this
                            because `state` cannot be modified in-place.
    @param[in]  z           The value of the unknown variable z.
    @param[out] state       The result after advancing the next time step.
 
-   @pre `next_state != nullptr`.
+   @pre `state != nullptr`.
+   @pre `&prev_state != state`.
    @pre The sizes of `prev_state`, `z`, and `state` are compatible. */
-  void AdvanceOneTimeStep(const DerState<T>& prev_state,
-                          const Eigen::Ref<const Eigen::VectorX<T>>& z,
-                          DerState<T>* state) const;
+  void AdvanceDt(const DerState<T>& prev_state,
+                 const Eigen::Ref<const Eigen::VectorX<T>>& z,
+                 DerState<T>* state) const;
 
   /* Adjusts the DerState `state` given the change in the unknown variables.
    More specifically, it sets the given `state` to the following values.
@@ -87,6 +88,8 @@ class DiscreteTimeIntegrator {
    @pre `dz.size() == state->num_dofs()`. */
   void AdjustStateFromChangeInUnknowns(
       const Eigen::Ref<const Eigen::VectorX<T>>& dz, DerState<T>* state) const;
+
+  void set_dt(double dt);
 
   /* Returns the discrete time step of the integration scheme. */
   double dt() const { return dt_; }
@@ -108,11 +111,10 @@ class DiscreteTimeIntegrator {
       const DerState<T>& state) const = 0;
 
   /* Derived classes must override this method to implement the NVI
-   AdvanceOneTimeStep(). */
-  virtual void DoAdvanceOneTimeStep(
-      const DerState<T>& prev_state,
-      const Eigen::Ref<const Eigen::VectorX<T>>& z,
-      DerState<T>* next_state) const = 0;
+   AdvanceDt(). */
+  virtual void DoAdvanceDt(const DerState<T>& prev_state,
+                           const Eigen::Ref<const Eigen::VectorX<T>>& z,
+                           DerState<T>* next_state) const = 0;
 
   /* Derived classes must override this method to implement the NVI
    AdjustStateFromChangeInUnknowns(). */

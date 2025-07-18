@@ -17,13 +17,14 @@ const Eigen::VectorX<T>& DiscreteTimeIntegrator<T>::GetUnknowns(
 }
 
 template <typename T>
-void DiscreteTimeIntegrator<T>::AdvanceOneTimeStep(
+void DiscreteTimeIntegrator<T>::AdvanceDt(
     const DerState<T>& prev_state, const Eigen::Ref<const Eigen::VectorX<T>>& z,
     DerState<T>* state) const {
   DRAKE_THROW_UNLESS(state != nullptr);
+  DRAKE_THROW_UNLESS(&prev_state != state);
   DRAKE_THROW_UNLESS(prev_state.num_dofs() == state->num_dofs());
   DRAKE_THROW_UNLESS(prev_state.num_dofs() == z.size());
-  DoAdvanceOneTimeStep(prev_state, z, state);
+  DoAdvanceDt(prev_state, z, state);
 }
 
 template <typename T>
@@ -32,6 +33,12 @@ void DiscreteTimeIntegrator<T>::AdjustStateFromChangeInUnknowns(
   DRAKE_THROW_UNLESS(state != nullptr);
   DRAKE_THROW_UNLESS(dz.size() == state->num_dofs());
   DoAdjustStateFromChangeInUnknowns(dz, state);
+}
+
+template <typename T>
+void DiscreteTimeIntegrator<T>::set_dt(double dt) {
+  DRAKE_THROW_UNLESS(dt > 0);
+  dt_ = dt;
 }
 
 template <typename T>

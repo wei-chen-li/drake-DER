@@ -49,9 +49,9 @@ class AccelerationNewmarkScheme final : public DiscreteTimeIntegrator<T> {
     return state.get_acceleration();
   }
 
-  void DoAdvanceOneTimeStep(const DerState<T>& prev_state,
-                            const Eigen::Ref<const Eigen::VectorX<T>>& z,
-                            DerState<T>* state) const final;
+  void DoAdvanceDt(const DerState<T>& prev_state,
+                   const Eigen::Ref<const Eigen::VectorX<T>>& z,
+                   DerState<T>* state) const final;
 
   void DoAdjustStateFromChangeInUnknowns(
       const Eigen::Ref<const Eigen::VectorX<T>>& dz,

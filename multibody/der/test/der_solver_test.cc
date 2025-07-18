@@ -26,19 +26,19 @@ class DerSolverTester {
   }
 
   template <typename T>
-  static const DiscreteTimeIntegrator<T>* integrator(
+  static const DiscreteTimeIntegrator<T>& integrator(
       const DerSolver<T>& solver) {
-    return solver.integrator_;
+    return *solver.integrator_;
   }
 
   template <typename T>
   static void set_max_iterations(DerSolver<T>* solver, int max_iters) {
-    solver->max_iterations_ = max_iters;
+    solver->max_newton_iters_ = max_iters;
   }
 
   template <typename T>
   static int max_iterations(const DerSolver<T>& solver) {
-    return solver.max_iterations_;
+    return solver.max_newton_iters_;
   }
 
   template <typename T>
@@ -90,8 +90,8 @@ class DerSolverTest : public ::testing::TestWithParam<bool> {
     integrator_ =
         std::make_unique<VelocityNewmarkScheme<double>>(dt, gamma, beta);
 
-    solver_ = std::make_unique<DerSolver<double>>(der_model_.get(),
-                                                  integrator_.get());
+    solver_ =
+        std::make_unique<DerSolver<double>>(der_model_.get(), *integrator_);
 
     const double g = 9.81;
     force_density_field_ =
@@ -152,8 +152,8 @@ TEST_P(DerSolverTest, Clone) {
   std::unique_ptr<DerSolver<double>> cloned = solver_->Clone();
   /* Check model and integrator are the same. */
   EXPECT_EQ(DerSolverTester::model(*cloned), DerSolverTester::model(*solver_));
-  EXPECT_EQ(DerSolverTester::integrator(*cloned),
-            DerSolverTester::integrator(*solver_));
+  EXPECT_EQ(DerSolverTester::integrator(*cloned).dt(),
+            DerSolverTester::integrator(*solver_).dt());
   /* Check owned states have same values. */
   EXPECT_EQ(cloned->get_state().get_position(),
             solver_->get_state().get_position());
@@ -244,7 +244,7 @@ void DerSolverCantileverBeamTest::TestStaticBending() {
 
   /* Solve the cantilever beam long enough to reach static equilibrium. */
   std::unique_ptr<DerState<double>> state = model->CreateDerState();
-  DerSolver<double> solver(model.get(), &integrator);
+  DerSolver<double> solver(model.get(), integrator);
   double t = 0.0;
   const double t_end = 1.0;
   while (t < t_end) {
@@ -305,7 +305,7 @@ TEST_P(DerSolverCantileverBeamTest, Bending) {
   state->SetVelocity(velocity);
 
   /* Simulate the vibrating cantilever beam. */
-  DerSolver<double> solver(model.get(), &integrator);
+  DerSolver<double> solver(model.get(), integrator);
   double t = 0.0;
   std::vector<double> t_crossing = {t};
   double prev_z_tip = 0.0;
@@ -365,7 +365,7 @@ void DerSolverCantileverBeamTest::TestStaticStretching() {
 
   /* Solve the beam long enough to reach static equilibrium. */
   std::unique_ptr<DerState<double>> state = model->CreateDerState();
-  DerSolver<double> solver(model.get(), &integrator);
+  DerSolver<double> solver(model.get(), integrator);
   double t = 0.0;
   const double t_end = 1.0;
   while (t < t_end) {
@@ -424,7 +424,7 @@ TEST_P(DerSolverCantileverBeamTest, Stretching) {
   state->SetVelocity(velocity);
 
   /* Simulate the periodic stretching beam. */
-  DerSolver<double> solver(model.get(), &integrator);
+  DerSolver<double> solver(model.get(), integrator);
   double t = 0.0;
   std::vector<double> t_crossing = {t};
   double prev_disp_tip = 0.0;
@@ -500,7 +500,7 @@ TEST_P(DerSolverCantileverBeamTest, Twisting) {
   state->SetVelocity(velocity);
 
   /* Simulate the periodic twisting beam. */
-  DerSolver<double> solver(model.get(), &integrator);
+  DerSolver<double> solver(model.get(), integrator);
   double t = 0.0;
   std::vector<double> t_crossing = {t};
   double prev_angle_tip = 0.0;

@@ -43,9 +43,9 @@ class DummyScheme final : public DiscreteTimeIntegrator<double> {
 
   // Dummy implementation to set the position of the state to the entry-wise
   // product of previous state's position and the unknown variable.
-  void DoAdvanceOneTimeStep(const DerState<double>& prev_state,
-                            const Eigen::Ref<const Eigen::VectorXd>& z,
-                            DerState<double>* state) const final {
+  void DoAdvanceDt(const DerState<double>& prev_state,
+                   const Eigen::Ref<const Eigen::VectorXd>& z,
+                   DerState<double>* state) const final {
     state->AdvancePositionToNextStep(prev_state.get_position().cwiseProduct(z));
   }
 };
@@ -80,11 +80,11 @@ TEST_F(DiscreteTimeIntegratorTest, GetUnknowns) {
   EXPECT_EQ(scheme_.GetUnknowns(state), state.get_position());
 }
 
-TEST_F(DiscreteTimeIntegratorTest, AdvanceOneTimeStep) {
+TEST_F(DiscreteTimeIntegratorTest, AdvanceDt) {
   const DerState<double> state0(der_state_system_.get());
   DerState<double> state(der_state_system_.get());
   const VectorXd z = VectorXd::LinSpaced(state.num_dofs(), 0.0, 1.0);
-  scheme_.AdvanceOneTimeStep(state0, z, &state);
+  scheme_.AdvanceDt(state0, z, &state);
   EXPECT_EQ(state.get_position(), state0.get_position().cwiseProduct(z));
 }
 
@@ -94,6 +94,11 @@ TEST_F(DiscreteTimeIntegratorTest, AdjustStateFromChangeInUnknowns) {
   const VectorXd expected = state.get_position() + dz;
   scheme_.AdjustStateFromChangeInUnknowns(dz, &state);
   EXPECT_EQ(state.get_position(), expected);
+}
+
+TEST_F(DiscreteTimeIntegratorTest, set_dt) {
+  scheme_.set_dt(1e-5);
+  EXPECT_EQ(scheme_.dt(), 1e-5);
 }
 
 }  // namespace

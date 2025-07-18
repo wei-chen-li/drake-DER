@@ -49,17 +49,17 @@ class VelocityNewmarkScheme final : public DiscreteTimeIntegrator<T> {
     return state.get_velocity();
   }
 
-  void DoAdvanceOneTimeStep(const DerState<T>& prev_state,
-                            const Eigen::Ref<const Eigen::VectorX<T>>& z,
-                            DerState<T>* state) const final;
+  void DoAdvanceDt(const DerState<T>& prev_state,
+                   const Eigen::Ref<const Eigen::VectorX<T>>& z,
+                   DerState<T>* state) const final;
 
   void DoAdjustStateFromChangeInUnknowns(
       const Eigen::Ref<const Eigen::VectorX<T>>& dz,
       DerState<T>* state) const final;
 
   const double gamma_{};
+  const double one_over_gamma_{};
   const double beta_over_gamma_{};
-  const double one_over_dt_gamma_{};
 };
 
 }  // namespace internal
