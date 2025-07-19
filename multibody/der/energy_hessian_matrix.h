@@ -42,6 +42,9 @@ class EnergyHessianMatrix {
   EnergyHessianMatrixVectorProduct<T> operator*(
       const Eigen::VectorX<T>& vec) const;
 
+  /* Returns the diagonal of this matrix. */
+  Eigen::VectorX<T> Diagonal() const;
+
   /* Sets the numerical values of all nonzero blocks to zero without changing
    the sparsity pattern. */
   void SetZero();

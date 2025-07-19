@@ -161,6 +161,12 @@ TEST_P(EnergyHessianMatrixTest, MatrixVectorProduct) {
   EXPECT_TRUE(CompareMatrices(result, expected, 1e-12));
 }
 
+TEST_P(EnergyHessianMatrixTest, Diagonal) {
+  const EnergyHessianMatrix<double> mat = MakeRandomMatrix();
+  EXPECT_TRUE(
+      CompareMatrices(mat.Diagonal(), mat.MakeDenseMatrix().diagonal()));
+}
+
 TEST_P(EnergyHessianMatrixTest, AddScaledDiagonalMatrix) {
   EnergyHessianMatrix<double> lhs = MakeRandomMatrix();
   const Eigen::DiagonalMatrix<double, Eigen::Dynamic> rhs(

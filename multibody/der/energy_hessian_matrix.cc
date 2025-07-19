@@ -71,6 +71,20 @@ EnergyHessianMatrixVectorProduct<T> EnergyHessianMatrix<T>::operator*(
 }
 
 template <typename T>
+Eigen::VectorX<T> EnergyHessianMatrix<T>::Diagonal() const {
+  Eigen::VectorX<T> diagonal(rows());
+  for (int block_i = 0; block_i < data_.block_rows(); ++block_i) {
+    const Eigen::Matrix4<T>& block = data_.block(block_i, block_i);
+    for (int u = 0; u < 4; ++u) {
+      const int i = block_i * 4 + u;
+      if (i >= rows()) continue;
+      diagonal[i] = block(u, u);
+    }
+  }
+  return diagonal;
+}
+
+template <typename T>
 void EnergyHessianMatrix<T>::SetZero() {
   data_.SetZero();
 }
