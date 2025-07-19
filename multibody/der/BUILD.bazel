@@ -178,11 +178,11 @@ drake_cc_library(
     srcs = ["energy_hessian_matrix.cc"],
     hdrs = ["energy_hessian_matrix.h"],
     deps = [
+        ":constraint_participation",
         ":der_indexes",
         ":schur_complement",
         "//common:default_scalars",
         "//multibody/contact_solvers:block_sparse_lower_triangular_or_symmetric_matrix",  # noqa
-        "//multibody/contact_solvers/sap:partial_permutation",
     ],
 )
 

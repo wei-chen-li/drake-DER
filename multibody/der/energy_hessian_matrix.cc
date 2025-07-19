@@ -2,14 +2,12 @@
 
 #include <algorithm>
 
-#include "drake/multibody/contact_solvers/sap/partial_permutation.h"
+#include "drake/multibody/der/constraint_participation.h"
 
 namespace drake {
 namespace multibody {
 namespace der {
 namespace internal {
-
-using contact_solvers::internal::PartialPermutation;
 
 template <typename T>
 EnergyHessianMatrix<T> EnergyHessianMatrix<T>::Allocate(int num_dofs) {
@@ -209,21 +207,23 @@ Eigen::SparseMatrix<T> EnergyHessianMatrix<T>::ComputeLowerTriangle() const {
 }
 
 template <typename T>
-static void FillInTriplets(int block_i, int block_j,
-                           const Eigen::Ref<const Matrix4<T>>& block,
-                           const PartialPermutation& permutation, int A_size,
-                           int num_dofs,
-                           std::vector<Eigen::Triplet<T>>* A_triplets,
-                           std::vector<Eigen::Triplet<T>>* Bt_triplets,
-                           std::vector<Eigen::Triplet<T>>* D_triplets) {
+static void FillInTriplets(
+    int block_i, int block_j, const Eigen::Ref<const Matrix4<T>>& block,
+    const contact_solvers::internal::PartialPermutation& permutation,
+    int A_size, std::vector<Eigen::Triplet<T>>* A_triplets,
+    std::vector<Eigen::Triplet<T>>* Bt_triplets,
+    std::vector<Eigen::Triplet<T>>* D_triplets) {
+  DRAKE_THROW_UNLESS(permutation.permuted_domain_size() ==
+                     permutation.domain_size());
+  const int num_dofs = permutation.domain_size();
   constexpr int block_size = 4;
   for (int i = 0; i < block_size; ++i) {
     for (int j = 0; j < block_size; ++j) {
       const int dof_i = block_size * block_i + i;
       const int dof_j = block_size * block_j + j;
       if (dof_i >= num_dofs || dof_j >= num_dofs) continue;
-      const int permuted_dof_i = permutation.permuted_index(dof_i);
-      const int permuted_dof_j = permutation.permuted_index(dof_j);
+      const int permuted_dof_i = permutation.permutation()[dof_i];
+      const int permuted_dof_j = permutation.permutation()[dof_j];
       if (permuted_dof_i < A_size && permuted_dof_j < A_size) {
         A_triplets->emplace_back(permuted_dof_i, permuted_dof_j, block(i, j));
       } else if (permuted_dof_i >= A_size && permuted_dof_j >= A_size) {
@@ -244,18 +244,9 @@ std::enable_if_t<std::is_same_v<T1, double>, SchurComplement<T>>
 EnergyHessianMatrix<T>::ComputeSchurComplement(
     const std::unordered_set<int>& participating_dofs) const {
   const int num_dofs = num_dofs_;
-  DRAKE_THROW_UNLESS(std::all_of(participating_dofs.begin(),
-                                 participating_dofs.end(), [&](int dof) {
-                                   return 0 <= dof && dof < num_dofs;
-                                 }));
   const int num_participating_dofs = participating_dofs.size();
-  std::vector<int> permuted_dof_indexes(num_dofs, -1);
-  int permuted_dof_index = 0;
-  for (int dof = 0; dof < num_dofs; ++dof) {
-    if (participating_dofs.contains(dof))
-      permuted_dof_indexes[dof] = permuted_dof_index++;
-  }
-  PartialPermutation permutation(std::move(permuted_dof_indexes));
+  contact_solvers::internal::PartialPermutation permutation =
+      ComputeDofPermutation(num_dofs, participating_dofs);
   permutation.ExtendToFullPermutation();
 
   std::vector<Eigen::Triplet<T>> A_triplets;
@@ -267,12 +258,12 @@ EnergyHessianMatrix<T>::ComputeSchurComplement(
          data_.sparsity_pattern().neighbors()[block_j]) {  // block_i ≥ block_j
       const Matrix4<T>& block = data_.block(block_i, block_j);
       FillInTriplets<T>(block_i, block_j, block, permutation,
-                        num_participating_dofs, num_dofs, &A_triplets,
-                        &Bt_triplets, &D_triplets);
+                        num_participating_dofs, &A_triplets, &Bt_triplets,
+                        &D_triplets);
       if (block_i == block_j) continue;
       FillInTriplets<T>(block_j, block_i, block.transpose(), permutation,
-                        num_participating_dofs, num_dofs, &A_triplets,
-                        &Bt_triplets, &D_triplets);
+                        num_participating_dofs, &A_triplets, &Bt_triplets,
+                        &D_triplets);
     }
   }
 

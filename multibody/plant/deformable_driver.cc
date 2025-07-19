@@ -176,8 +176,7 @@ void DeformableDriver<T>::DeclareCacheEntries(
 
       /* Constraint participation information for each body. */
       der::internal::ConstraintParticipation empty_constraint_participation(
-          der_model.has_closed_ends(), der_model.num_nodes(),
-          der_model.num_edges());
+          der_model.num_dofs());
       const auto& constraint_participation_cache_entry =
           manager->DeclareCacheEntry(
               fmt::format("constraint participation of body {}", i),
@@ -1713,7 +1712,7 @@ void DeformableDriver<T>::CalcNextDerState(const systems::Context<T>& context,
                                            DerState<T>* next_der_state) const {
   const der::internal::ConstraintParticipation& participation =
       EvalDerConstraintParticipation(context, index);
-  if (participation.no_participation()) {
+  if (participation.empty()) {
     const DerState<T>& free_motion_state =
         EvalFreeMotionDerState(context, index);
     next_der_state->CopyFrom(free_motion_state);
@@ -1859,9 +1858,8 @@ void DeformableDriver<T>::CalcDerConstraintParticipation(
   const DeformableBody<T>& body = deformable_model_->GetBody(body_id);
   const DerModel<T>* der_model = deformable_model_->GetDerModel(body_id);
   DRAKE_DEMAND(der_model != nullptr);
-  *constraint_participation = der::internal::ConstraintParticipation(
-      der_model->has_closed_ends(), der_model->num_nodes(),
-      der_model->num_edges());
+  *constraint_participation =
+      der::internal::ConstraintParticipation(der_model->num_dofs());
   if (!deformable_model_->is_enabled(body_id, context)) return;
   const GeometryId geometry_id = deformable_model_->GetGeometryId(body_id);
   const FilamentContact<T>& contact_data = EvalFilamentContact(context);
