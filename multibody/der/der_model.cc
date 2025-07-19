@@ -326,11 +326,14 @@ const Eigen::VectorX<T>& DerModel<T>::ComputeResidual(
   if (alpha != 0) residual += alpha * (M * qdot);
   if (beta != 0) {
     auto& cache = scratch->state_to_d2Eidq2;
-    std::get<0>(cache) = static_cast<const void*>(&state);
-    std::get<1>(cache) = state.serial_number();
     internal::EnergyHessianMatrix<T>& d2Eidq2 = std::get<2>(cache);
-    internal::ComputeElasticEnergyHessian<T>(
-        der_structural_property_, der_undeformed_state_, state, &d2Eidq2);
+    if (!(std::get<0>(cache) == &state &&
+          std::get<1>(cache) == state.serial_number())) {
+      std::get<0>(cache) = static_cast<const void*>(&state);
+      std::get<1>(cache) = state.serial_number();
+      internal::ComputeElasticEnergyHessian<T>(
+          der_structural_property_, der_undeformed_state_, state, &d2Eidq2);
+    }
 
     const internal::EnergyHessianMatrix<T>& K = d2Eidq2;
     residual += beta * (K * qdot);
@@ -355,8 +358,10 @@ const internal::EnergyHessianMatrix<T>& DerModel<T>::ComputeTangentMatrix(
    recalculate `d2Eidq2`. */
   auto& cache = scratch->state_to_d2Eidq2;
   internal::EnergyHessianMatrix<T>& d2Eidq2 = std::get<2>(cache);
-  if (!(&state == std::get<0>(cache) &&
-        state.serial_number() == std::get<1>(cache))) {
+  if (!(std::get<0>(cache) == &state &&
+        std::get<1>(cache) == state.serial_number())) {
+    std::get<0>(cache) = static_cast<const void*>(&state);
+    std::get<1>(cache) = state.serial_number();
     internal::ComputeElasticEnergyHessian<T>(
         der_structural_property_, der_undeformed_state_, state, &d2Eidq2);
   }
