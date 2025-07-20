@@ -91,9 +91,9 @@ void EnergyHessianMatrix<T>::SetZero() {
 
 template <typename T>
 void EnergyHessianMatrix<T>::Insert(DerNodeIndex i, DerNodeIndex j,
-                                    const Eigen::Ref<const Matrix3<T>>& mat) {
+                                    Matrix3<T> mat) {
   Eigen::Matrix4<T> filler = Eigen::Matrix4<T>::Zero();
-  filler.template topLeftCorner<3, 3>() = mat;
+  filler.template topLeftCorner<3, 3>() = std::move(mat);
   if (int{i} >= int{j})
     data_.AddToBlock(i, j, filler);
   else
@@ -102,9 +102,9 @@ void EnergyHessianMatrix<T>::Insert(DerNodeIndex i, DerNodeIndex j,
 
 template <typename T>
 void EnergyHessianMatrix<T>::Insert(DerNodeIndex i, DerEdgeIndex j,
-                                    const Eigen::Ref<const Vector3<T>>& vec) {
+                                    Vector3<T> vec) {
   Eigen::Matrix4<T> filler = Eigen::Matrix4<T>::Zero();
-  filler.template topRightCorner<3, 1>() = vec;
+  filler.template topRightCorner<3, 1>() = std::move(vec);
   if (int{i} == int{j}) {
     data_.AddToBlock(i, j, filler + filler.transpose());
   } else {
@@ -116,10 +116,9 @@ void EnergyHessianMatrix<T>::Insert(DerNodeIndex i, DerEdgeIndex j,
 }
 
 template <typename T>
-void EnergyHessianMatrix<T>::Insert(DerEdgeIndex i, DerEdgeIndex j,
-                                    const T& val) {
+void EnergyHessianMatrix<T>::Insert(DerEdgeIndex i, DerEdgeIndex j, T val) {
   Eigen::Matrix4<T> filler = Eigen::Matrix4<T>::Zero();
-  filler(3, 3) = val;
+  filler(3, 3) = std::move(val);
   if (int{i} >= int{j})
     data_.AddToBlock(i, j, filler);
   else

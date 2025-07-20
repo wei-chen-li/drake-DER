@@ -100,7 +100,11 @@ class ElasticEnergyTest : public ::testing::TestWithParam<bool> {
     EnergyHessianMatrix<double> d2Edq2 =
         EnergyHessianMatrix<double>::Allocate(state_ad_->num_dofs());
     {
+      /* OpenMP runtime allocates heap, so we disarm LimitMalloc if _OPENMP is
+       defined. */
+#if !defined(_OPENMP)
       LimitMalloc guard;
+#endif
       hessian_calc_func(*prop_, *undeformed_, *state_, &d2Edq2,
                         Parallelism::None());
     }
@@ -117,8 +121,13 @@ class ElasticEnergyTest : public ::testing::TestWithParam<bool> {
 
     /* Also test parallelized version. */
     d2Edq2.SetZero();
-    hessian_calc_func(*prop_, *undeformed_, *state_, &d2Edq2,
-                      Parallelism::Max());
+    {
+#if !defined(_OPENMP)
+      LimitMalloc guard;
+#endif
+      hessian_calc_func(*prop_, *undeformed_, *state_, &d2Edq2,
+                        Parallelism::Max());
+    }
     EXPECT_TRUE(
         CompareMatrices(d2Edq2.MakeDenseMatrix(), d2Edq2_autodiff, 1e-8));
   }

@@ -50,15 +50,13 @@ class EnergyHessianMatrix {
   void SetZero();
 
   /* Inserts mat = ∂²E/∂(xᵢ)(xⱼ) into this hessian. */
-  void Insert(DerNodeIndex i, DerNodeIndex j,
-              const Eigen::Ref<const Matrix3<T>>& mat);
+  void Insert(DerNodeIndex i, DerNodeIndex j, Matrix3<T> mat);
 
   /* Inserts vec = ∂²E/∂(xᵢ)(γʲ) into this hessian. */
-  void Insert(DerNodeIndex i, DerEdgeIndex j,
-              const Eigen::Ref<const Vector3<T>>& vec);
+  void Insert(DerNodeIndex i, DerEdgeIndex j, Vector3<T> vec);
 
   /* Inserts val = ∂²E/∂(γⁱ)(γʲ) into this hessian.  */
-  void Insert(DerEdgeIndex i, DerEdgeIndex j, const T& val);
+  void Insert(DerEdgeIndex i, DerEdgeIndex j, T val);
 
   /* Adds a scaled diagonal matrix to this matrix.
    @pre `rhs.rows() == rows()`. */

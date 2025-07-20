@@ -338,7 +338,11 @@ TEST_P(DerModelTest, ComputeResidual) {
   auto scratch = der_model_->MakeScratch();
   const VectorXd* residual;
   {
+    /* OpenMP runtime allocates heap, so we disarm LimitMalloc if _OPENMP is
+     defined. */
+#if !defined(_OPENMP)
     LimitMalloc guard;
+#endif
     residual = &der_model_->ComputeResidual(*state, external_force_field,
                                             scratch.get());
   }
@@ -384,7 +388,11 @@ TEST_P(DerModelTest, ComputeTangentMatrix) {
   auto scratch = der_model_->MakeScratch();
   const internal::EnergyHessianMatrix<double>* tangent_matrix;
   {
+    /* OpenMP runtime allocates heap, so we disarm LimitMalloc if _OPENMP is
+     defined. */
+#if !defined(_OPENMP)
     LimitMalloc guard;
+#endif
     tangent_matrix =
         &der_model_->ComputeTangentMatrix(*state, weights, scratch.get());
   }
