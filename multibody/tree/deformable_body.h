@@ -141,6 +141,7 @@ class DeformableBody final : public MultibodyElement<T> {
    %DeformableBody uses when opportunities for parallel computation arises. */
   void set_parallelism(Parallelism parallelism) {
     if (fem_model_) fem_model_->set_parallelism(parallelism);
+    if (der_model_) der_model_->set_parallelism(parallelism);
   }
 
   /** Sets wall boundary conditions for this deformable body. All vertices of

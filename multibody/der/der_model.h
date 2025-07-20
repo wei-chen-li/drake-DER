@@ -8,6 +8,7 @@
 #include <variant>
 #include <vector>
 
+#include "drake/common/parallelism.h"
 #include "drake/multibody/der/damping_model.h"
 #include "drake/multibody/der/der_indexes.h"
 #include "drake/multibody/der/der_state.h"
@@ -290,8 +291,17 @@ class DerModel {
     return der_undeformed_state_;
   }
 
-  /** Checks whether the given `state` is created from `this` DerModel. */
+  /** (Internal use only)  Checks whether the given `state` is created from
+   * `this` DerModel. */
   void ValidateDerState(const internal::DerState<T>& state) const;
+
+  /** (Internal use only) Configures the parallelism that `this` DerModel uses
+   when opportunities for parallel computation arises. */
+  void set_parallelism(Parallelism parallelism) { parallelism_ = parallelism; }
+
+  /** (Internal use only) Returns the parallelism that `this` DerModel uses
+   when opportunities for parallel computation arises. */
+  Parallelism parallelism() const { return parallelism_; }
 
  private:
   /* Share private fields among DerModel, used by ToScalarType(). */
@@ -316,6 +326,7 @@ class DerModel {
   DerUndeformedState<T> der_undeformed_state_;
   const internal::DampingModel<T> damping_model_;
   internal::DirichletBoundaryCondition<T> boundary_condition_;
+  Parallelism parallelism_{false};
 };
 
 }  // namespace der
