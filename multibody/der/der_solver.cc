@@ -138,8 +138,8 @@ void DerSolver<T>::ComputeTangentMatrixSchurComplement(
   const EnergyHessianMatrix<T>& tangent_matrix = model_->ComputeTangentMatrix(
       state, integrator_->GetWeights(), der_model_scratch);
 
-  tangent_matrix_schur_complement_ =
-      tangent_matrix.ComputeSchurComplement(participating_dofs);
+  tangent_matrix_schur_complement_ = tangent_matrix.ComputeSchurComplement(
+      participating_dofs, model_->parallelism());
 }
 
 template <typename T>

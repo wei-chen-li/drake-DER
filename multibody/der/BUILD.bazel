@@ -183,6 +183,7 @@ drake_cc_library(
         ":der_indexes",
         ":schur_complement",
         "//common:default_scalars",
+        "//common:parallelism",
         "//multibody/contact_solvers:block_sparse_lower_triangular_or_symmetric_matrix",  # noqa
     ],
 )
@@ -325,6 +326,7 @@ drake_cc_googletest(
 
 drake_cc_googletest(
     name = "energy_hessian_matrix_test",
+    num_threads = 2,
     deps = [
         ":energy_hessian_matrix",
         "//common/test_utilities:eigen_matrix_compare",

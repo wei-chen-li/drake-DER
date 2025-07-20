@@ -209,8 +209,10 @@ TEST_P(EnergyHessianMatrixTest, ComputeLowerTriangle) {
 TEST_P(EnergyHessianMatrixTest, ComputeSchurComplement) {
   const std::unordered_set<int> participating_dofs = {2, 3, 5, 7, 11, 13, 17};
   const EnergyHessianMatrix<double> mat = MakeRandomMatrix();
-  const SchurComplement<double> schur_complement =
-      mat.ComputeSchurComplement(participating_dofs);
+  const SchurComplement<double> schur_complement1 =
+      mat.ComputeSchurComplement(participating_dofs, Parallelism::None());
+  const SchurComplement<double> schur_complement2 =
+      mat.ComputeSchurComplement(participating_dofs, Parallelism::Max());
 
   const int num_dofs = mat.rows();
   Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic> P(num_dofs);
@@ -230,9 +232,12 @@ TEST_P(EnergyHessianMatrixTest, ComputeSchurComplement) {
       num_participating_dofs, num_dofs - num_participating_dofs);
   const MatrixXd D = permuted_mat.bottomRightCorner(
       num_dofs - num_participating_dofs, num_dofs - num_participating_dofs);
+  const MatrixXd D_complement = A - B * D.inverse() * B.transpose();
 
-  EXPECT_TRUE(CompareMatrices(schur_complement.get_D_complement(),
-                              A - B * D.inverse() * B.transpose(), 1e-12));
+  EXPECT_TRUE(CompareMatrices(schur_complement1.get_D_complement(),
+                              D_complement, 1e-12));
+  EXPECT_TRUE(CompareMatrices(schur_complement2.get_D_complement(),
+                              D_complement, 1e-12));
 }
 
 }  // namespace
