@@ -3,7 +3,6 @@
 #include <unordered_set>
 
 #include "drake/common/default_scalars.h"
-#include "drake/common/parallelism.h"
 #include "drake/multibody/contact_solvers/block_sparse_lower_triangular_or_symmetric_matrix.h"
 #include "drake/multibody/der/der_indexes.h"
 #include "drake/multibody/der/schur_complement.h"
@@ -97,8 +96,8 @@ class EnergyHessianMatrix {
    @throws if `this` is not positive definite. */
   template <typename T1 = T>
   std::enable_if_t<std::is_same_v<T1, double>, SchurComplement<T>>
-  ComputeSchurComplement(const std::unordered_set<int>& participating_dofs,
-                         Parallelism parallelism) const;
+  ComputeSchurComplement(
+      const std::unordered_set<int>& participating_dofs) const;
 
   /* Makes a dense representation of this matrix. Useful for debugging purposes.
    */

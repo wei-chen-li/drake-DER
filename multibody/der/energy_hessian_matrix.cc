@@ -1,8 +1,6 @@
 #include "drake/multibody/der/energy_hessian_matrix.h"
 
-#if defined(_OPENMP)
-#include <omp.h>
-#endif
+#include <algorithm>
 
 #include "drake/multibody/der/constraint_participation.h"
 
@@ -258,46 +256,20 @@ template <typename T>
 template <typename T1>
 std::enable_if_t<std::is_same_v<T1, double>, SchurComplement<T>>
 EnergyHessianMatrix<T>::ComputeSchurComplement(
-    const std::unordered_set<int>& participating_dofs,
-    Parallelism parallelism) const {
+    const std::unordered_set<int>& participating_dofs) const {
   const int num_dofs = num_dofs_;
   const int num_participating_dofs = participating_dofs.size();
   contact_solvers::internal::PartialPermutation permutation =
       ComputeDofPermutation(num_dofs, participating_dofs);
   permutation.ExtendToFullPermutation();
 
-  std::vector<std::pair<int, int>> block_ij_s;
+  std::vector<Eigen::Triplet<T>> A_triplets;
+  std::vector<Eigen::Triplet<T>> Bt_triplets;
+  std::vector<Eigen::Triplet<T>> D_triplets;
+
   for (int block_j = 0; block_j < data_.block_cols(); ++block_j) {
-    for (int block_i : data_.sparsity_pattern().neighbors()[block_j]) {
-      block_ij_s.emplace_back(block_i, block_j);
-    }
-  }
-
-  const int num_threads = parallelism.num_threads();
-
-  std::vector<std::vector<Eigen::Triplet<T>>> A_triplets_list(num_threads);
-  std::vector<std::vector<Eigen::Triplet<T>>> Bt_triplets_list(num_threads);
-  std::vector<std::vector<Eigen::Triplet<T>>> D_triplets_list(num_threads);
-
-#if defined(_OPENMP)
-#pragma omp parallel num_threads(num_threads)
-#endif
-#if defined(_OPENMP)
-  {
-    const int tid = omp_get_thread_num();
-#else
-  {
-    const int tid = 0;
-#endif
-    std::vector<Eigen::Triplet<T>>& A_triplets = A_triplets_list[tid];
-    std::vector<Eigen::Triplet<T>>& Bt_triplets = Bt_triplets_list[tid];
-    std::vector<Eigen::Triplet<T>>& D_triplets = D_triplets_list[tid];
-
-#if defined(_OPENMP)
-#pragma omp for
-#endif
-    for (int k = 0; k < ssize(block_ij_s); ++k) {
-      const auto& [block_i, block_j] = block_ij_s[k];
+    for (int block_i :
+         data_.sparsity_pattern().neighbors()[block_j]) {  // block_i ≥ block_j
       const Matrix4<T>& block = data_.block(block_i, block_j);
       FillInTriplets<T>(block_i, block_j, block, permutation,
                         num_participating_dofs, &A_triplets, &Bt_triplets,
@@ -309,33 +281,14 @@ EnergyHessianMatrix<T>::ComputeSchurComplement(
     }
   }
 
-  std::vector<Eigen::Triplet<T>> triplets;
   Eigen::SparseMatrix<T> A(num_participating_dofs, num_participating_dofs);
-  triplets.clear();
-  for (int k = 0; k < num_threads; ++k) {
-    triplets.insert(triplets.end(), A_triplets_list[k].begin(),
-                    A_triplets_list[k].end());
-  }
-  A.setFromTriplets(triplets.begin(), triplets.end());
-
+  A.setFromTriplets(A_triplets.begin(), A_triplets.end());
   Eigen::SparseMatrix<T> Bt(num_dofs - num_participating_dofs,
                             num_participating_dofs);
-  triplets.clear();
-  for (int k = 0; k < num_threads; ++k) {
-    triplets.insert(triplets.end(), Bt_triplets_list[k].begin(),
-                    Bt_triplets_list[k].end());
-  }
-  Bt.setFromTriplets(triplets.begin(), triplets.end());
-
+  Bt.setFromTriplets(Bt_triplets.begin(), Bt_triplets.end());
   Eigen::SparseMatrix<T> D(num_dofs - num_participating_dofs,
                            num_dofs - num_participating_dofs);
-  triplets.clear();
-  for (int k = 0; k < num_threads; ++k) {
-    triplets.insert(triplets.end(), D_triplets_list[k].begin(),
-                    D_triplets_list[k].end());
-  }
-  D.setFromTriplets(triplets.begin(), triplets.end());
-
+  D.setFromTriplets(D_triplets.begin(), D_triplets.end());
   return SchurComplement<T>(A, Bt, D);
 }
 
@@ -404,7 +357,7 @@ Eigen::Ref<Eigen::VectorX<T>> EnergyHessianMatrixVectorProduct<T>::AddToVector(
 
 template SchurComplement<double>
 EnergyHessianMatrix<double>::ComputeSchurComplement<double>(
-    const std::unordered_set<int>&, Parallelism) const;
+    const std::unordered_set<int>&) const;
 
 }  // namespace internal
 }  // namespace der
