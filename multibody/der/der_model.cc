@@ -331,8 +331,9 @@ const Eigen::VectorX<T>& DerModel<T>::ComputeResidual(
           std::get<1>(cache) == state.serial_number())) {
       std::get<0>(cache) = static_cast<const void*>(&state);
       std::get<1>(cache) = state.serial_number();
-      internal::ComputeElasticEnergyHessian<T>(
-          der_structural_property_, der_undeformed_state_, state, &d2Eidq2);
+      internal::ComputeElasticEnergyHessian<T>(der_structural_property_,
+                                               der_undeformed_state_, state,
+                                               &d2Eidq2, parallelism_);
     }
 
     const internal::EnergyHessianMatrix<T>& K = d2Eidq2;
@@ -362,8 +363,9 @@ const internal::EnergyHessianMatrix<T>& DerModel<T>::ComputeTangentMatrix(
         std::get<1>(cache) == state.serial_number())) {
     std::get<0>(cache) = static_cast<const void*>(&state);
     std::get<1>(cache) = state.serial_number();
-    internal::ComputeElasticEnergyHessian<T>(
-        der_structural_property_, der_undeformed_state_, state, &d2Eidq2);
+    internal::ComputeElasticEnergyHessian<T>(der_structural_property_,
+                                             der_undeformed_state_, state,
+                                             &d2Eidq2, parallelism_);
   }
 
   const internal::EnergyHessianMatrix<T>& K = d2Eidq2;

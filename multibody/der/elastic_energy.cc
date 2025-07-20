@@ -86,16 +86,17 @@ template <typename T>
 void ComputeElasticEnergyHessian(const DerStructuralProperty<T>& prop,
                                  const DerUndeformedState<T>& undeformed,
                                  const DerState<T>& state,
-                                 EnergyHessianMatrix<T>* hessian) {
+                                 EnergyHessianMatrix<T>* hessian,
+                                 Parallelism parallelism) {
   DRAKE_THROW_UNLESS(undeformed.has_closed_ends() == state.has_closed_ends());
   DRAKE_THROW_UNLESS(undeformed.num_nodes() == state.num_nodes());
   DRAKE_THROW_UNLESS(hessian != nullptr);
   DRAKE_THROW_UNLESS(hessian->rows() == state.num_dofs() &&
                      hessian->cols() == state.num_dofs());
   hessian->SetZero();
-  AddStretchingEnergyHessian(prop, undeformed, state, hessian);
-  AddTwistingEnergyHessian(prop, undeformed, state, hessian);
-  AddBendingEnergyHessian(prop, undeformed, state, hessian);
+  AddStretchingEnergyHessian(prop, undeformed, state, hessian, parallelism);
+  AddTwistingEnergyHessian(prop, undeformed, state, hessian, parallelism);
+  AddBendingEnergyHessian(prop, undeformed, state, hessian, parallelism);
 }
 
 template <typename T>
@@ -143,7 +144,8 @@ template <typename T>
 void AddStretchingEnergyHessian(const DerStructuralProperty<T>& prop,
                                 const DerUndeformedState<T>& undeformed,
                                 const DerState<T>& state,
-                                EnergyHessianMatrix<T>* hessian) {
+                                EnergyHessianMatrix<T>* hessian,
+                                Parallelism parallelism) {
   DRAKE_THROW_UNLESS(hessian != nullptr);
 
   const auto& l_undeformed = undeformed.get_edge_length();
@@ -238,7 +240,8 @@ template <typename T>
 void AddTwistingEnergyHessian(const DerStructuralProperty<T>& prop,
                               const DerUndeformedState<T>& undeformed,
                               const DerState<T>& state,
-                              EnergyHessianMatrix<T>* hessian) {
+                              EnergyHessianMatrix<T>* hessian,
+                              Parallelism parallelism) {
   DRAKE_THROW_UNLESS(hessian != nullptr);
 
   const auto& V_undeformed = undeformed.get_voronoi_length();
@@ -462,7 +465,8 @@ template <typename T>
 void AddBendingEnergyHessian(const DerStructuralProperty<T>& prop,
                              const DerUndeformedState<T>& undeformed,
                              const DerState<T>& state,
-                             EnergyHessianMatrix<T>* hessian) {
+                             EnergyHessianMatrix<T>* hessian,
+                             Parallelism parallelism) {
   DRAKE_THROW_UNLESS(hessian != nullptr);
 
   const auto& V_undeformed = undeformed.get_voronoi_length();

@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "drake/common/parallelism.h"
 #include "drake/multibody/der/der_state.h"
 #include "drake/multibody/der/der_structural_property.h"
 #include "drake/multibody/der/der_undeformed_state.h"
@@ -43,7 +44,8 @@ template <typename T>
 void ComputeElasticEnergyHessian(const DerStructuralProperty<T>& prop,
                                  const DerUndeformedState<T>& undeformed,
                                  const DerState<T>& state,
-                                 EnergyHessianMatrix<T>* hessian);
+                                 EnergyHessianMatrix<T>* hessian,
+                                 Parallelism parallelism);
 
 /* Computes Eₛ. */
 template <typename T>
@@ -63,7 +65,8 @@ template <typename T>
 void AddStretchingEnergyHessian(const DerStructuralProperty<T>& prop,
                                 const DerUndeformedState<T>& undeformed,
                                 const DerState<T>& state,
-                                EnergyHessianMatrix<T>* hessian);
+                                EnergyHessianMatrix<T>* hessian,
+                                Parallelism parallelism);
 
 /* Computes Eₜ. */
 template <typename T>
@@ -83,7 +86,8 @@ template <typename T>
 void AddTwistingEnergyHessian(const DerStructuralProperty<T>& prop,
                               const DerUndeformedState<T>& undeformed,
                               const DerState<T>& state,
-                              EnergyHessianMatrix<T>* hessian);
+                              EnergyHessianMatrix<T>* hessian,
+                              Parallelism parallelism);
 
 /* Computes Eₙ. */
 template <typename T>
@@ -103,7 +107,8 @@ template <typename T>
 void AddBendingEnergyHessian(const DerStructuralProperty<T>& prop,
                              const DerUndeformedState<T>& undeformed,
                              const DerState<T>& state,
-                             EnergyHessianMatrix<T>* hessian);
+                             EnergyHessianMatrix<T>* hessian,
+                             Parallelism parallelism);
 
 }  // namespace internal
 }  // namespace der

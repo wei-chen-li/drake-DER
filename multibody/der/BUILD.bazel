@@ -170,6 +170,7 @@ drake_cc_library(
         ":der_structural_property",
         ":der_undeformed_state",
         ":energy_hessian_matrix",
+        "//common:parallelism",
         "//math:vector3_util",
     ],
 )
@@ -316,9 +317,12 @@ drake_cc_googletest(
 
 drake_cc_googletest(
     name = "elastic_energy_test",
+    num_threads = 2,
     deps = [
         ":elastic_energy",
+        "//common:pointer_cast",
         "//common/test_utilities:eigen_matrix_compare",
+        "//common/test_utilities:limit_malloc",
         "//math:gradient",
     ],
 )

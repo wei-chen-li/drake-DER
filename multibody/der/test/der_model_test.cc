@@ -355,7 +355,8 @@ TEST_P(DerModelTest, ComputeResidual) {
                                                  &dEdq);
   auto d2Edq2 =
       internal::EnergyHessianMatrix<double>::Allocate(state->num_dofs());
-  internal::ComputeElasticEnergyHessian(prop, undeformed, *state, &d2Edq2);
+  internal::ComputeElasticEnergyHessian(prop, undeformed, *state, &d2Edq2,
+                                        Parallelism::None());
 
   MatrixXd M = ComputeMassMatrix(prop, undeformed).toDenseMatrix();
   MatrixXd K = d2Edq2.MakeDenseMatrix().topLeftCorner(num_dofs, num_dofs);
@@ -397,7 +398,8 @@ TEST_P(DerModelTest, ComputeTangentMatrix) {
 
   auto d2Edq2 =
       internal::EnergyHessianMatrix<double>::Allocate(state->num_dofs());
-  internal::ComputeElasticEnergyHessian(prop, undeformed, *state, &d2Edq2);
+  internal::ComputeElasticEnergyHessian(prop, undeformed, *state, &d2Edq2,
+                                        Parallelism::None());
 
   MatrixXd M = ComputeMassMatrix(prop, undeformed).toDenseMatrix();
   MatrixXd K = d2Edq2.MakeDenseMatrix().topLeftCorner(num_dofs, num_dofs);
