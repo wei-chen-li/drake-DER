@@ -82,8 +82,8 @@ void DeformableDriver<T>::DeclareCacheEntries(
 
   for (DeformableBodyIndex i(0); i < deformable_model_->num_bodies(); ++i) {
     const DeformableBodyId id = deformable_model_->GetBodyId(i);
-    if (deformable_model_->GetFemModel(id)) {
-      const fem::FemModel<T>& fem_model = *deformable_model_->GetFemModel(id);
+    if (deformable_model_->get_model_type(id) == DeformableBody<T>::kFem) {
+      const fem::FemModel<T>& fem_model = deformable_model_->GetFemModel(id);
       std::unique_ptr<fem::FemState<T>> model_state = fem_model.MakeFemState();
       /* Cache entry for current FEM state. */
       const auto& fem_state_cache_entry_ticket =
@@ -164,8 +164,9 @@ void DeformableDriver<T>::DeclareCacheEntries(
            systems::System<T>::accuracy_ticket()});
       cache_indexes_.next_states.emplace_back(
           next_fem_state_cache_entry.cache_index());
-    } else if (deformable_model_->GetDerModel(id)) {
-      const DerModel<T>& der_model = *deformable_model_->GetDerModel(id);
+    } else if (deformable_model_->get_model_type(id) ==
+               DeformableBody<T>::kDer) {
+      const DerModel<T>& der_model = deformable_model_->GetDerModel(id);
       std::unique_ptr<DerState<T>> model_state = der_model.CreateDerState();
       /* Cache entry for current DER state. */
       const auto& der_state_cache_entry_ticket =
@@ -302,7 +303,7 @@ void DeformableDriver<T>::AppendLinearDynamicsMatrix(
       A->push_back(MatrixX<T>::Zero(0, 0));
       continue;
     }
-    if (deformable_model_->GetFemModel(body_id)) {
+    if (deformable_model_->get_model_type(body_id) == DeformableBody<T>::kFem) {
       const SchurComplement& schur_complement =
           EvalFreeMotionFemTangentMatrixSchurComplement(context, index);
       /* The schur complement is of the tangent matrix of the force balance
@@ -310,7 +311,8 @@ void DeformableDriver<T>::AppendLinearDynamicsMatrix(
        momentum balance. Hence, we scale by dt here. */
       A->push_back(schur_complement.get_D_complement() *
                    manager_->plant().time_step());
-    } else if (deformable_model_->GetDerModel(body_id)) {
+    } else if (deformable_model_->get_model_type(body_id) ==
+               DeformableBody<T>::kDer) {
       const der::internal::SchurComplement<T>& schur_complement =
           EvalFreeMotionDerTangentMatrixSchurComplement(context, index);
       A->push_back(schur_complement.get_D_complement() *
@@ -345,7 +347,7 @@ DeformableDriver<T>::ComputeContactDataForDeformable(
   /* Retrieve the boundary condition information of the body to determine
    which columns for the jacobian need to be zeroed out later. */
   const DeformableBodyId body_id = deformable_model_->GetBodyId(geometry_id);
-  const FemModel<T>& fem_model = *deformable_model_->GetFemModel(body_id);
+  const FemModel<T>& fem_model = deformable_model_->GetFemModel(body_id);
   const DirichletBoundaryCondition<T>& bc =
       fem_model.dirichlet_boundary_condition();
   /* The number of boundary conditions added to each vertex. */
@@ -512,7 +514,7 @@ DeformableDriver<T>::ComputeContactDataForFilament(
   const Multiplexer<T>& mux = EvalParticipatingVelocityMultiplexer(context);
   const Eigen::Ref<const VectorX<T>> body_participating_v0 =
       mux.Demultiplex(deformable_participating_v0, body_index);
-  const DerModel<T>& der_model = *deformable_model_->GetDerModel(body_id);
+  const DerModel<T>& der_model = deformable_model_->GetDerModel(body_id);
 
   ContactData result;
   /* For filament objects, we use the mean of the contact points as the
@@ -923,8 +925,7 @@ void DeformableDriver<T>::AppendDiscreteContactPairs(
         for (int node : spec.nodes) fixed_nodes.insert(node);
       }
     }
-    const int num_nodes =
-        deformable_model_->GetDerModel(body_id_A)->num_nodes();
+    const int num_nodes = deformable_model_->GetDerModel(body_id_A).num_nodes();
 
     /* We reuse `jacobian_blocks` for the Jacobian blocks for each contact point
      and clear the vector repeatedly in the loop over the contact points. */
@@ -1095,12 +1096,12 @@ void DeformableDriver<T>::AppendDeformableRigidFixedConstraintKinematics(
   for (DeformableBodyIndex index(0); index < deformable_model_->num_bodies();
        ++index) {
     const DeformableBody<T>& body = deformable_model_->GetBody(index);
-    if (!(body.fem_model() && body.is_enabled(context) &&
-          body.has_fixed_constraint())) {
+    if (!(body.model_type() == DeformableBody<T>::kFem &&
+          body.is_enabled(context) && body.has_fixed_constraint())) {
       continue;
     }
 
-    const FemModel<T>& fem_model = *body.fem_model();
+    const FemModel<T>& fem_model = body.fem_model();
     const DirichletBoundaryCondition<T>& bc =
         fem_model.dirichlet_boundary_condition();
 
@@ -1220,11 +1221,11 @@ void DeformableDriver<T>::AppendFilamentRigidFixedConstraintKinematics(
   for (DeformableBodyIndex index(0); index < deformable_model_->num_bodies();
        ++index) {
     const DeformableBody<T>& body = deformable_model_->GetBody(index);
-    if (!(body.der_model() && body.is_enabled(context) &&
-          body.has_fixed_constraint())) {
+    if (!(body.model_type() == DeformableBody<T>::kDer &&
+          body.is_enabled(context) && body.has_fixed_constraint())) {
       continue;
     }
-    const DerModel<T>& der_model = *body.der_model();
+    const DerModel<T>& der_model = body.der_model();
 
     // Each deformable body forms its own clique and are indexed in inceasing
     // DeformableBodyIndex order and placed after all rigid cliques.
@@ -1456,7 +1457,7 @@ void DeformableDriver<T>::CalcDiscreteStates(
   const int num_bodies = deformable_model_->num_bodies();
   for (DeformableBodyIndex index(0); index < num_bodies; ++index) {
     DeformableBodyId id = deformable_model_->GetBodyId(index);
-    if (deformable_model_->GetFemModel(id)) {
+    if (deformable_model_->get_model_type(id) == DeformableBody<T>::kFem) {
       const FemState<T>& next_fem_state = EvalNextFemState(context, index);
       const int num_dofs = next_fem_state.num_dofs();
       // Update the discrete values.
@@ -1467,7 +1468,8 @@ void DeformableDriver<T>::CalcDiscreteStates(
       discrete_value.tail(num_dofs) = next_fem_state.GetAccelerations();
       next_states->set_value(deformable_model_->GetDiscreteStateIndex(id),
                              discrete_value);
-    } else if (deformable_model_->GetDerModel(id)) {
+    } else if (deformable_model_->get_model_type(id) ==
+               DeformableBody<T>::kDer) {
       const DerState<T>& next_der_state = EvalNextDerState(context, index);
       next_states->set_value(deformable_model_->GetDiscreteStateIndex(id),
                              next_der_state.Serialize());
@@ -1789,7 +1791,7 @@ void DeformableDriver<T>::CalcDeformableContact(
   for (DeformableBodyIndex body_index(0);
        body_index < deformable_model_->num_bodies(); ++body_index) {
     const DeformableBody<T>& body = deformable_model_->GetBody(body_index);
-    if (!body.fem_model()) continue;
+    if (body.model_type() != DeformableBody<T>::kFem) continue;
     /* Add in constraints. */
     if (body.has_fixed_constraint()) {
       std::unordered_set<int> fixed_vertices;
@@ -1803,7 +1805,7 @@ void DeformableDriver<T>::CalcDeformableContact(
       GeometryId geometry_id = body.geometry_id();
       if (!result->IsRegistered(geometry_id)) {
         result->RegisterDeformableGeometry(geometry_id,
-                                           body.fem_model()->num_nodes());
+                                           body.fem_model().num_nodes());
       }
       result->Participate(geometry_id, fixed_vertices);
     }
@@ -1830,7 +1832,7 @@ void DeformableDriver<T>::CalcFemConstraintParticipation(
   const DeformableBodyId body_id = deformable_model_->GetBodyId(index);
   if (!deformable_model_->is_enabled(body_id, context)) {
     const int num_vertices =
-        deformable_model_->GetFemModel(body_id)->num_nodes();
+        deformable_model_->GetFemModel(body_id).num_nodes();
     *constraint_participation =
         geometry::internal::ContactParticipation(num_vertices);
     return;
@@ -1856,10 +1858,9 @@ void DeformableDriver<T>::CalcDerConstraintParticipation(
   DRAKE_DEMAND(constraint_participation != nullptr);
   const DeformableBodyId body_id = deformable_model_->GetBodyId(index);
   const DeformableBody<T>& body = deformable_model_->GetBody(body_id);
-  const DerModel<T>* der_model = deformable_model_->GetDerModel(body_id);
-  DRAKE_DEMAND(der_model != nullptr);
+  const DerModel<T>& der_model = deformable_model_->GetDerModel(body_id);
   *constraint_participation =
-      der::internal::ConstraintParticipation(der_model->num_dofs());
+      der::internal::ConstraintParticipation(der_model.num_dofs());
   if (!deformable_model_->is_enabled(body_id, context)) return;
   const GeometryId geometry_id = deformable_model_->GetGeometryId(body_id);
   const FilamentContact<T>& contact_data = EvalFilamentContact(context);
@@ -1912,12 +1913,12 @@ template <typename T>
 const PartialPermutation& DeformableDriver<T>::EvalDofPermutation(
     const Context<T>& context, DeformableBodyIndex index) const {
   DeformableBodyId id = deformable_model_->GetBodyId(index);
-  if (deformable_model_->GetFemModel(id)) {
+  if (deformable_model_->get_model_type(id) == DeformableBody<T>::kFem) {
     return manager_->plant()
         .get_cache_entry(cache_indexes_.permutations.at(index))
         .template Eval<VertexPartialPermutation>(context)
         .dof();
-  } else if (deformable_model_->GetDerModel(id)) {
+  } else if (deformable_model_->get_model_type(id) == DeformableBody<T>::kDer) {
     return manager_->plant()
         .get_cache_entry(cache_indexes_.permutations.at(index))
         .template Eval<PartialPermutation>(context);
@@ -1955,10 +1956,11 @@ void DeformableDriver<T>::CalcParticipatingVelocities(
     const PartialPermutation& permutation = EvalDofPermutation(context, i);
     participating_velocities[i].resize(permutation.permuted_domain_size());
     DeformableBodyId id = deformable_model_->GetBodyId(i);
-    if (deformable_model_->GetFemModel(id)) {
+    if (deformable_model_->get_model_type(id) == DeformableBody<T>::kFem) {
       const VectorX<T>& v = EvalFemState(context, i).GetVelocities();
       permutation.Apply(v, &participating_velocities[i]);
-    } else if (deformable_model_->GetDerModel(id)) {
+    } else if (deformable_model_->get_model_type(id) ==
+               DeformableBody<T>::kDer) {
       const VectorX<T>& v = EvalDerState(context, i).get_velocity();
       permutation.Apply(v, &participating_velocities[i]);
     } else {
@@ -1987,11 +1989,12 @@ void DeformableDriver<T>::CalcParticipatingFreeMotionVelocities(
     const PartialPermutation& permutation = EvalDofPermutation(context, i);
     participating_v_star[i].resize(permutation.permuted_domain_size());
     DeformableBodyId id = deformable_model_->GetBodyId(i);
-    if (deformable_model_->GetFemModel(id)) {
+    if (deformable_model_->get_model_type(id) == DeformableBody<T>::kFem) {
       const VectorX<T>& v_star =
           EvalFreeMotionFemState(context, i).GetVelocities();
       permutation.Apply(v_star, &participating_v_star[i]);
-    } else if (deformable_model_->GetDerModel(id)) {
+    } else if (deformable_model_->get_model_type(id) ==
+               DeformableBody<T>::kDer) {
       const VectorX<T>& v_star =
           EvalFreeMotionDerState(context, i).get_velocity();
       permutation.Apply(v_star, &participating_v_star[i]);

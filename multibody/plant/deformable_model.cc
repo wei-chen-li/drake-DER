@@ -205,16 +205,25 @@ void DeformableModel<T>::Enable(DeformableBodyId id,
 }
 
 template <typename T>
-const fem::FemModel<T>* DeformableModel<T>::GetFemModel(
+typename DeformableBody<T>::ModelType DeformableModel<T>::get_model_type(
     DeformableBodyId id) const {
   ThrowUnlessRegistered(__func__, id);
+  return GetBody(id).model_type();
+}
+
+template <typename T>
+const fem::FemModel<T>& DeformableModel<T>::GetFemModel(
+    DeformableBodyId id) const {
+  ThrowUnlessRegistered(__func__, id);
+  DRAKE_THROW_UNLESS(get_model_type(id) == DeformableBody<T>::kFem);
   return GetBody(id).fem_model();
 }
 
 template <typename T>
-const der::DerModel<T>* DeformableModel<T>::GetDerModel(
+const der::DerModel<T>& DeformableModel<T>::GetDerModel(
     DeformableBodyId id) const {
   ThrowUnlessRegistered(__func__, id);
+  DRAKE_THROW_UNLESS(get_model_type(id) == DeformableBody<T>::kDer);
   return GetBody(id).der_model();
 }
 
@@ -477,17 +486,17 @@ void DeformableModel<T>::ComputeConfigurationVector(
     const DeformableBody<T>& body = deformable_bodies_.get_element(index);
     const GeometryId geometry_id = body.geometry_id();
     const auto& discrete_state_index = body.discrete_state_index();
-    if (body.fem_model()) {
-      const int num_dofs = body.fem_model()->num_dofs();
+    if (body.model_type() == DeformableBody<T>::kFem) {
+      const int num_dofs = body.fem_model().num_dofs();
       VectorX<T> vertex_positions =
           context.get_discrete_state(discrete_state_index)
               .value()
               .head(num_dofs);
       output_value.set_value(geometry_id, std::move(vertex_positions));
-    } else if (body.der_model()) {
+    } else if (body.model_type() == DeformableBody<T>::kDer) {
       // TODO(wei-chen): Maybe store a DerState in cache to avoid allocating
       // every time.
-      auto der_state = body.der_model()->CreateDerState();
+      auto der_state = body.der_model().CreateDerState();
       der_state->Deserialize(
           context.get_discrete_state(discrete_state_index).value());
       /* The configuration vector contains the node positions and edge m₁

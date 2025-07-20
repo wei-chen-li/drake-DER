@@ -282,17 +282,23 @@ class DeformableModel final : public multibody::PhysicalModel<T> {
     return GetBody(id).is_enabled(context);
   }
 
-  /** Returns the FemModel for the body with `id`. Or nullptr if the body with
-   `id` is associated with a model other than FemModel.
+  /** Returns the model type for the body with `id`.
    @throws exception if no deformable body with `id` is registered with `this`
    %DeformableModel. */
-  const fem::FemModel<T>* GetFemModel(DeformableBodyId id) const;
+  typename DeformableBody<T>::ModelType get_model_type(
+      DeformableBodyId id) const;
 
-  /** Returns the DerModel for the body with `id`. Or nullptr if the body with
-   `id` is associated with a model other than DerModel.
+  /** Returns the FemModel for the body with `id`.
    @throws exception if no deformable body with `id` is registered with `this`
-   %DeformableModel. */
-  const der::DerModel<T>* GetDerModel(DeformableBodyId id) const;
+   %DeformableModel.
+   @throws exception if `get_model_type(id) != ModelType::kFem`.  */
+  const fem::FemModel<T>& GetFemModel(DeformableBodyId id) const;
+
+  /** Returns the DerModel for the body with `id`.
+   @throws exception if no deformable body with `id` is registered with `this`
+   %DeformableModel.
+   @throws exception if `get_model_type(id) != ModelType::kDer`. */
+  const der::DerModel<T>& GetDerModel(DeformableBodyId id) const;
 
   /** Returns the reference positions of the vertices of the deformable body
    identified by the given `id`.

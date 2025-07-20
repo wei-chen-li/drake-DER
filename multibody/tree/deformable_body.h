@@ -80,15 +80,31 @@ class DeformableBody final : public MultibodyElement<T> {
     return reference_positions_;
   }
 
-  /** Returns the FemModel for this deformable body. May be nullptr. */
-  const fem::FemModel<T>* fem_model() const { return fem_model_.get(); }
+  enum ModelType {
+    kFem,
+    kDer,
+  };
 
-  /** Returns the DerModel for this deformable body. May be nullptr. */
-  const der::DerModel<T>* der_model() const { return der_model_.get(); }
+  ModelType model_type() const { return model_type_; }
 
-  /** Returns the mutable DerModel for this deformable body. */
+  /** Returns the FemModel for this deformable body.
+   @pre `model_type() == kFem`. */
+  const fem::FemModel<T>& fem_model() const {
+    DRAKE_THROW_UNLESS(model_type() == kFem);
+    return *fem_model_;
+  }
+
+  /** Returns the DerModel for this deformable body.
+   @pre `model_type() == kDer`. */
+  const der::DerModel<T>& der_model() const {
+    DRAKE_THROW_UNLESS(model_type() == kDer);
+    return *der_model_;
+  }
+
+  /** Returns the mutable DerModel for this deformable body.
+   @pre `model_type() == kFem`. */
   der::DerModel<T>& mutable_der_model() {
-    DRAKE_THROW_UNLESS(der_model_ != nullptr);
+    DRAKE_THROW_UNLESS(model_type() == kDer);
     return *der_model_;
   }
 
@@ -182,16 +198,20 @@ class DeformableBody final : public MultibodyElement<T> {
   }
 
   /** (Internal use only) Returns a reference to the fixed constraints
-   registered with this deformable body. */
+   registered with this deformable body.
+   @pre `model_type() == kFem`. */
   const std::vector<internal::DeformableRigidFixedConstraintSpec>&
   fixed_constraint_specs() const {
+    DRAKE_THROW_UNLESS(model_type() == kFem);
     return fixed_constraint_specs_;
   }
 
   /** (Internal use only) Returns a reference to the fixed constraints
-   registered with this deformable body. */
+   registered with this deformable body.
+   @pre `model_type() == kDer`.  */
   const std::vector<internal::FilamentRigidFixedConstraintSpec>&
   fixed_constraint_specs2() const {
+    DRAKE_THROW_UNLESS(model_type() == kDer);
     return fixed_constraint_specs2_;
   }
 
@@ -446,6 +466,7 @@ class DeformableBody final : public MultibodyElement<T> {
   DeformableBodyId id_{};
   std::string name_;
   geometry::GeometryId geometry_id_{};
+  ModelType model_type_{};
   /* The mesh of the deformable geometry (in its reference configuration) in
    its geometry frame. */
   std::optional<geometry::VolumeMesh<double>> mesh_G_;
