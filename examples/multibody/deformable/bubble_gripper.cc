@@ -1,10 +1,11 @@
+#include <iostream>
 #include <memory>
 
 #include <gflags/gflags.h>
 
 #include "drake/common/find_resource.h"
 #include "drake/examples/multibody/deformable/parallel_gripper_controller.h"
-#include "drake/geometry/drake_visualizer.h"
+#include "drake/geometry/meshcat_visualizer.h"
 #include "drake/geometry/proximity_properties.h"
 #include "drake/geometry/render_vtk/factory.h"
 #include "drake/math/rigid_transform.h"
@@ -173,10 +174,11 @@ int do_main() {
                   plant.get_desired_state_input_port(gripper_instance));
 
   /* Add a visualizer that emits LCM messages for visualization. */
-  geometry::DrakeVisualizerParams params;
+  auto meshcat = std::make_shared<geometry::Meshcat>();
+  geometry::MeshcatVisualizerParams params;
   params.role = geometry::Role::kIllustration;
-  geometry::DrakeVisualizerd::AddToBuilder(&builder, scene_graph, nullptr,
-                                           params);
+  geometry::MeshcatVisualizer<double>::AddToBuilder(&builder, scene_graph,
+                                                    meshcat, params);
   /* We want to look in the -Py direction so we line up Bz with -Py.*/
   const Vector3d Bz_P = -Vector3d::UnitY();
   const Vector3d Bx_P = -Vector3d::UnitZ();
@@ -222,7 +224,13 @@ int do_main() {
 
   simulator.Initialize();
   simulator.set_target_realtime_rate(FLAGS_realtime_rate);
+  meshcat->StartRecording();
   simulator.AdvanceTo(FLAGS_simulation_time);
+  meshcat->StopRecording();
+  meshcat->PublishRecording();
+
+  std::string a;
+  std::cin >> a;
 
   return 0;
 }
