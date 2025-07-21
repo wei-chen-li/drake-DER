@@ -75,6 +75,7 @@ class HessianParallelInserter {
   {
     DRAKE_THROW_UNLESS(hessian_ != nullptr);
     DRAKE_THROW_UNLESS(num_threads_ > 0);
+    unused(parallelism);
     if (num_threads_ > 1) {
       data1_.resize(num_threads_);
       data2_.resize(num_threads_);
