@@ -158,6 +158,11 @@ class MeshcatVisualizer final : public systems::LeafSystem<T> {
    configuring it. Once the geometry is loaded, they can be updated en masse. */
   void SetAlphas(bool initializing) const;
 
+  /* Makes calls to Meshcat::SetObject to update the configuration of deformable
+   bodies. */
+  void SetDeformables(const systems::Context<T>& context,
+                      const QueryObject<T>& query_object) const;
+
   /* Handles the initialization event. */
   systems::EventStatus OnInitialization(const systems::Context<T>&) const;
 

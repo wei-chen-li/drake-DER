@@ -67,6 +67,13 @@ class MeshcatRecording {
                     const math::RigidTransformd& X_ParentPath,
                     std::optional<double> time_in_recording);
 
+  /* Like SetProperty (with all of the same animation decisions), but for an
+  object. Conditionally adds this object represented in msgpack serialized json
+  format to the current animation, and decides whether or not to show this
+  property in the live Meshcat session. */
+  bool SetObject(std::string_view path, std::string object_json,
+                 std::optional<double> time_in_recording);
+
  private:
   struct AnimationDetail {
     // A frame number for use with MeshcatAnimation, or nullopt if this event

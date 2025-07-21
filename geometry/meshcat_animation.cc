@@ -34,6 +34,11 @@ void MeshcatAnimation::SetProperty(int frame, std::string_view path,
   SetProperty(frame, path, property, "vector", value);
 }
 
+void MeshcatAnimation::SetObject(int frame, std::string_view path,
+                                 std::string object_json) {
+  SetProperty(frame, path, "object", "Object", std::move(object_json));
+}
+
 const MeshcatAnimation::TypedTrack* MeshcatAnimation::GetTypedTrack(
     std::string_view path, std::string_view property) const {
   const auto path_iter = path_tracks_.find(path);
@@ -89,7 +94,7 @@ std::string MeshcatAnimation::get_javascript_type(
 template <typename T>
 void MeshcatAnimation::SetProperty(int frame, std::string_view path,
                                    std::string_view property,
-                                   std::string_view js_type, const T& value) {
+                                   std::string_view js_type, T value) {
   TypedTrack& typed_track = GetOrCreateTypedTrack(path, property);
   if (std::holds_alternative<std::monostate>(typed_track.track)) {
     typed_track.track = Track<T>();
@@ -100,7 +105,7 @@ void MeshcatAnimation::SetProperty(int frame, std::string_view path,
         path, property, typed_track.js_type, js_type));
   }
   // get<T> will also throw bad_variant_access if the types don't match.
-  std::get<Track<T>>(typed_track.track)[frame] = value;
+  std::get<Track<T>>(typed_track.track)[frame] = std::move(value);
 }
 
 }  // namespace geometry

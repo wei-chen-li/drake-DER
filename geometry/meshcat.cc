@@ -789,13 +789,16 @@ class Meshcat::Impl {
   //   loop_ is non-null; and
   //   mode_ is either kFinished (the typical case) or possibly kStopping (in
   //     the unusual case where websocket thread faulted soon after starting).
-  explicit Impl(const MeshcatParams& params)
+  explicit Impl(const MeshcatParams& params,
+                internal::MeshcatRecording* recording)
       : prefix_("/drake"),
         main_thread_id_(std::this_thread::get_id()),
         params_(params),
-        rate_calculator_(params_.realtime_rate_period) {
+        rate_calculator_(params_.realtime_rate_period),
+        recording_(*recording) {
     DRAKE_THROW_UNLESS(!params.port.has_value() || *params.port == 0 ||
                        *params.port >= 1024);
+    DRAKE_THROW_UNLESS(recording != nullptr);
     if (!drake::internal::IsNetworkingAllowed("meshcat")) {
       throw std::runtime_error(
           "Meshcat has been disabled via the DRAKE_ALLOW_NETWORK environment "
@@ -1207,7 +1210,8 @@ class Meshcat::Impl {
                        const Eigen::Ref<const Eigen::Matrix3Xd>& vertices,
                        const Eigen::Ref<const Eigen::Matrix3Xi>& faces,
                        const Rgba& rgba, bool wireframe,
-                       double wireframe_line_width, SideOfFaceToRender side) {
+                       double wireframe_line_width, SideOfFaceToRender side,
+                       std::optional<double> time_in_recording = std::nullopt) {
     DRAKE_DEMAND(IsThread(main_thread_id_));
 
     internal::SetObjectData data;
@@ -1216,6 +1220,16 @@ class Meshcat::Impl {
     SetLumpedObjectFromTriangleMesh(&data.object, vertices, faces, rgba,
                                     wireframe, wireframe_line_width, side,
                                     &uuid_generator_);
+
+    bool show_live = true;
+    if (time_in_recording.has_value()) {
+      std::stringstream message_stream;
+      msgpack::pack(message_stream, data.object);
+      std::string object_json = std::move(message_stream).str();
+      show_live =
+          recording_.SetObject(path, std::move(object_json), time_in_recording);
+    }
+    if (!show_live) return;
 
     Defer([this, data = std::move(data)]() {
       std::stringstream message_stream;
@@ -1449,10 +1463,27 @@ class Meshcat::Impl {
               o.pack("type");
               o.pack(property_track.second.js_type);
               o.pack("keys");
+              const bool is_object = (property_track.first == "object");
               std::visit(
-                  [&o](const auto& track) {
+                  [&o, is_object](const auto& track) {
                     using T = std::decay_t<decltype(track)>;
-                    if constexpr (!std::is_same_v<T, std::monostate>) {
+                    if constexpr (std::is_same_v<T, typename MeshcatAnimation::
+                                                        Track<std::string>>) {
+                      DRAKE_DEMAND(is_object);
+                      o.pack_array(track.size());
+                      for (const auto& key : track) {
+                        o.pack_map(2);
+                        o.pack("time");
+                        o.pack(key.first);
+                        o.pack("value");
+                        const std::string& obj_json = key.second;
+                        msgpack::object_handle oh =
+                            msgpack::unpack(obj_json.data(), obj_json.size());
+                        msgpack::object obj = oh.get();
+                        o << obj;
+                      }
+                    } else if constexpr (!std::is_same_v<T, std::monostate>) {
+                      DRAKE_DEMAND(!is_object);
                       o.pack_array(track.size());
                       for (const auto& key : track) {
                         o.pack_map(2);
@@ -2450,6 +2481,7 @@ class Meshcat::Impl {
   systems::internal::RealtimeRateCalculator rate_calculator_;
   double realtime_rate_{0.0};
   bool is_orthographic_{false};
+  internal::MeshcatRecording& recording_;
 
   // These variables should only be accessed in the websocket thread.
   std::thread::id websocket_thread_id_{};
@@ -2554,8 +2586,8 @@ Meshcat::Meshcat(std::optional<int> port)
 
 Meshcat::Meshcat(const MeshcatParams& params)
     // The Impl constructor creates the server thread, binds to the port, etc.
-    : impl_{new Impl(params)},
-      recording_{std::make_unique<internal::MeshcatRecording>()} {
+    : recording_{std::make_unique<internal::MeshcatRecording>()},
+      impl_{new Impl(params, recording_.get())} {
   drake::log()->info("Meshcat listening for connections at {}", web_url());
 }
 
@@ -2630,9 +2662,10 @@ void Meshcat::SetLineSegments(std::string_view path,
 void Meshcat::SetTriangleMesh(
     std::string_view path, const Eigen::Ref<const Eigen::Matrix3Xd>& vertices,
     const Eigen::Ref<const Eigen::Matrix3Xi>& faces, const Rgba& rgba,
-    bool wireframe, double wireframe_line_width, SideOfFaceToRender side) {
+    bool wireframe, double wireframe_line_width, SideOfFaceToRender side,
+    std::optional<double> time_in_recording) {
   impl().SetTriangleMesh(path, vertices, faces, rgba, wireframe,
-                         wireframe_line_width, side);
+                         wireframe_line_width, side, time_in_recording);
 }
 
 void Meshcat::SetTriangleColorMesh(

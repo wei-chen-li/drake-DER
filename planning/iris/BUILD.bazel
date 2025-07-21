@@ -88,6 +88,9 @@ drake_cc_library(
         "//planning:scene_graph_collision_checker",
         "//solvers",
     ],
+    implementation_deps = [
+        "@common_robotics_utilities_internal//:common_robotics_utilities",
+    ],
 )
 
 drake_cc_googletest(
@@ -131,6 +134,8 @@ drake_cc_googletest(
     tags = [
         "no_asan",
         "no_lsan",
+        # TODO(#22978) Re-enable this if possible.
+        "no_memcheck",
     ],
     deps = [
         ":iris_test_utilities",

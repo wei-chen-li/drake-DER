@@ -57,6 +57,15 @@ bool MeshcatRecording::SetTransform(std::string_view path,
   return detail.show_live;
 }
 
+bool MeshcatRecording::SetObject(std::string_view path, std::string object_json,
+                                 std::optional<double> time_in_recording) {
+  const AnimationDetail detail = CalcDetail(time_in_recording);
+  if (detail.frame.has_value()) {
+    animation_->SetObject(*detail.frame, path, std::move(object_json));
+  }
+  return detail.show_live;
+}
+
 MeshcatRecording::AnimationDetail MeshcatRecording::CalcDetail(
     std::optional<double> time_in_recording) const {
   if (!(recording_ && time_in_recording.has_value())) {
