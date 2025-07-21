@@ -278,49 +278,6 @@ void MeshcatVisualizer<T>::SetTransforms(
 }
 
 template <typename T>
-void MeshcatVisualizer<T>::SetDeformables(
-    const QueryObject<T>& query_object) const {
-  const SceneGraphInspector<T>& inspector = query_object.inspector();
-  for (const GeometryId geom_id : inspector.GetAllDeformableGeometryIds()) {
-    const GeometryProperties& properties =
-        *inspector.GetProperties(geom_id, params_.role);
-    if (properties.HasProperty("meshcat", "accepting")) {
-      if (properties.GetProperty<std::string>("meshcat", "accepting") !=
-          params_.prefix) {
-        continue;
-      }
-    } else if (!params_.include_unspecified_accepting) {
-      continue;
-    }
-
-    // We'll turn scoped names into meshcat paths.
-    const std::string geometry_name =
-        internal::TransformGeometryName(geom_id, inspector);
-    const std::string path =
-        fmt::format("{}/{}", params_.prefix, geometry_name);
-    const Rgba rgba = properties.GetPropertyOrDefault("phong", "diffuse",
-                                                      params_.default_color);
-
-    const Filament* reference_filament =
-        inspector.GetReferenceFilament(geom_id);
-    if (reference_filament == nullptr) continue;
-    const bool closed = reference_filament->closed();
-    const int num_nodes = reference_filament->node_pos().cols();
-    const int num_edges = reference_filament->edge_m1().cols();
-    const VectorX<double> q_WF =
-        ExtractDoubleOrThrow(query_object.GetConfigurationsInWorld(geom_id));
-    DRAKE_DEMAND(q_WF.size() == 3 * num_nodes + 3 * num_edges);
-    const Eigen::Matrix3Xd node_pos =
-        Eigen::Map<const Eigen::Matrix3Xd>(q_WF.data(), 3, num_nodes);
-    const Eigen::Matrix3Xd edge_m1 = Eigen::Map<const Eigen::Matrix3Xd>(
-        q_WF.data() + 3 * num_nodes, 3, num_edges);
-    const Filament filament(closed, node_pos, edge_m1,
-                            reference_filament->cross_section());
-    meshcat_->SetObject(path, filament, rgba);
-  }
-}
-
-template <typename T>
 void MeshcatVisualizer<T>::SetAlphas(bool initializing) const {
   if (initializing) {
     for (const auto& [_, geo_path] : geometries_) {
@@ -369,33 +326,63 @@ void MeshcatVisualizer<T>::SetDeformables(
     const std::string path =
         fmt::format("{}/{}", params_.prefix, geometry_name);
 
-    // Get the render mesh and mesh vertices positions.
-    const std::vector<internal::RenderMesh>& render_meshes =
-        inspector.GetDrivenRenderMeshes(geom_id, params_.role);
-    const std::vector<VectorX<T>> vertex_positions =
-        query_object.GetDrivenMeshConfigurationsInWorld(geom_id, params_.role);
-    DRAKE_DEMAND(ssize(vertex_positions) == ssize(render_meshes));
-    if (render_meshes.empty()) continue;
+    const VolumeMesh<double>* reference_mesh =
+        inspector.GetReferenceMesh(geom_id);
+    const Filament* reference_filament =
+        inspector.GetReferenceFilament(geom_id);
+    if (reference_mesh == nullptr && reference_filament == nullptr) continue;
 
-    // There is typically only one render mesh and its associated vertex
-    // positions.
-    const Eigen::VectorXd vertices = ExtractDoubleOrThrow(vertex_positions[0]);
-    const Eigen::Matrix<unsigned int, Eigen::Dynamic, 3, Eigen::RowMajor>&
-        faces = render_meshes[0].indices;
+    if (reference_mesh != nullptr) {
+      // Get the render mesh and mesh vertices positions.
+      const std::vector<internal::RenderMesh>& render_meshes =
+          inspector.GetDrivenRenderMeshes(geom_id, params_.role);
+      const std::vector<VectorX<T>> vertex_positions =
+          query_object.GetDrivenMeshConfigurationsInWorld(geom_id,
+                                                          params_.role);
+      DRAKE_DEMAND(ssize(vertex_positions) == ssize(render_meshes));
+      if (render_meshes.empty()) continue;
 
-    const Rgba& rgba = render_meshes[0].material.has_value()
-                           ? render_meshes[0].material->diffuse
-                           : params_.default_color;
+      // There is typically only one render mesh and its associated vertex
+      // positions.
+      const Eigen::VectorXd vertices =
+          ExtractDoubleOrThrow(vertex_positions[0]);
+      const Eigen::Matrix<unsigned int, Eigen::Dynamic, 3, Eigen::RowMajor>&
+          faces = render_meshes[0].indices;
 
-    meshcat_->SetTransform(path, math::RigidTransformd());
-    meshcat_->SetTriangleMesh(path,
-                              Eigen::Map<const Eigen::Matrix3Xd>(
-                                  vertices.data(), 3, ssize(vertices) / 3),
-                              faces.cast<int>().transpose(), rgba,
-                              /* wireframe = */ false,
-                              /* wireframe_line_width = */ 1.0,
-                              Meshcat::kDoubleSide,
-                              ExtractDoubleOrThrow(context.get_time()));
+      const Rgba& rgba = render_meshes[0].material.has_value()
+                             ? render_meshes[0].material->diffuse
+                             : params_.default_color;
+
+      meshcat_->SetTransform(path, math::RigidTransformd());
+      meshcat_->SetTriangleMesh(path,
+                                Eigen::Map<const Eigen::Matrix3Xd>(
+                                    vertices.data(), 3, ssize(vertices) / 3),
+                                faces.cast<int>().transpose(), rgba,
+                                /* wireframe = */ false,
+                                /* wireframe_line_width = */ 1.0,
+                                Meshcat::kDoubleSide,
+                                ExtractDoubleOrThrow(context.get_time()));
+    } else {
+      const bool closed = reference_filament->closed();
+      const int num_nodes = reference_filament->node_pos().cols();
+      const int num_edges = reference_filament->edge_m1().cols();
+
+      const VectorX<double> q_WF =
+          ExtractDoubleOrThrow(query_object.GetConfigurationsInWorld(geom_id));
+      DRAKE_DEMAND(q_WF.size() == 3 * num_nodes + 3 * num_edges);
+      const Eigen::Matrix3Xd node_pos =
+          Eigen::Map<const Eigen::Matrix3Xd>(q_WF.data(), 3, num_nodes);
+      const Eigen::Matrix3Xd edge_m1 = Eigen::Map<const Eigen::Matrix3Xd>(
+          q_WF.data() + 3 * num_nodes, 3, num_edges);
+      const Filament filament(closed, node_pos, edge_m1,
+                              reference_filament->cross_section());
+
+      const Rgba rgba = properties.GetPropertyOrDefault("phong", "diffuse",
+                                                        params_.default_color);
+
+      meshcat_->SetTransform(path, math::RigidTransformd());
+      meshcat_->SetObject(path, filament, rgba);
+    }
     geometries_[geom_id] = path;
   }
 }

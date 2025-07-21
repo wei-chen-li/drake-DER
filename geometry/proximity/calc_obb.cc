@@ -58,7 +58,7 @@ std::optional<Obb> CalcObb(const Shape& shape) {
                                         ellipsoid.c());
         return Obb(RigidTransform<double>::Identity(), half_size);
       },
-      [](const Filament& filament) {
+      [](const Filament&) {
         // TODO(wei-chen): Implement CalcObb for Filament.
         return std::nullopt;
       },

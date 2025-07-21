@@ -294,6 +294,7 @@ void DefineMeshcat(py::module m) {
             py::arg("rgba") = Rgba(0.1, 0.1, 0.1, 1.0),
             py::arg("wireframe") = false, py::arg("wireframe_line_width") = 1.0,
             py::arg("side") = Meshcat::SideOfFaceToRender::kDoubleSide,
+            py::arg("time_in_recording") = std::nullopt,
             cls_doc.SetTriangleMesh.doc)
         .def("SetTriangleColorMesh", &Class::SetTriangleColorMesh,
             py::arg("path"), py::arg("vertices"), py::arg("faces"),
