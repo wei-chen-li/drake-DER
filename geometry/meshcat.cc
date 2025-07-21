@@ -1009,7 +1009,8 @@ class Meshcat::Impl {
   }
 
   // This function is public via the PIMPL.
-  void SetObject(std::string_view path, const Shape& shape, const Rgba& rgba) {
+  void SetObject(std::string_view path, const Shape& shape, const Rgba& rgba,
+                 std::optional<double> time_in_recording) {
     DRAKE_DEMAND(IsThread(main_thread_id_));
 
     internal::SetObjectData data;
@@ -1062,6 +1063,16 @@ class Meshcat::Impl {
         data.object.material = std::move(material);
       }
     }
+
+    bool show_live = true;
+    if (time_in_recording.has_value()) {
+      std::stringstream message_stream;
+      msgpack::pack(message_stream, data.object);
+      std::string object_json = std::move(message_stream).str();
+      show_live =
+          recording_.SetObject(path, std::move(object_json), time_in_recording);
+    }
+    if (!show_live) return;
 
     Defer([this, data = std::move(data), assets = std::move(assets)]() {
       DRAKE_DEMAND(IsThread(websocket_thread_id_));
@@ -2629,8 +2640,9 @@ void Meshcat::Flush() const {
 }
 
 void Meshcat::SetObject(std::string_view path, const Shape& shape,
-                        const Rgba& rgba) {
-  impl().SetObject(path, shape, rgba);
+                        const Rgba& rgba,
+                        std::optional<double> time_in_recording) {
+  impl().SetObject(path, shape, rgba, time_in_recording);
 }
 
 void Meshcat::SetObject(std::string_view path,

@@ -381,7 +381,8 @@ void MeshcatVisualizer<T>::SetDeformables(
                                                         params_.default_color);
 
       meshcat_->SetTransform(path, math::RigidTransformd());
-      meshcat_->SetObject(path, filament, rgba);
+      meshcat_->SetObject(path, filament, rgba,
+                          ExtractDoubleOrThrow(context.get_time()));
     }
     geometries_[geom_id] = path;
   }

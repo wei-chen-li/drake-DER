@@ -188,7 +188,8 @@ class Meshcat {
   @pydrake_mkdoc_identifier{shape}
   */
   void SetObject(std::string_view path, const Shape& shape,
-                 const Rgba& rgba = Rgba(.9, .9, .9, 1.));
+                 const Rgba& rgba = Rgba(.9, .9, .9, 1.),
+                 std::optional<double> time_in_recording = std::nullopt);
 
   // TODO(russt): SetObject with texture map.
 
