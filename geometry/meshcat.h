@@ -1013,12 +1013,12 @@ class Meshcat {
   Impl& impl();
   const Impl& impl() const;
 
+  /* Encapsulated recording logic. The value is never nullptr. */
+  std::unique_ptr<internal::MeshcatRecording> recording_;
+
   // Always a non-nullptr Impl, but stored as void* to enforce that the
   // impl() accessors are always used.
   void* const impl_{};
-
-  /* Encapsulated recording logic. The value is never nullptr. */
-  std::unique_ptr<internal::MeshcatRecording> recording_;
 };
 
 }  // namespace geometry

@@ -167,6 +167,18 @@ class MeshcatAnimation {
   void SetProperty(int frame, std::string_view path, std::string_view property,
                    const std::vector<double>& value);
 
+  /** Set the object at `frame` in the animation for a given `path` in
+  the the scene tree.
+  @param frame a non-negative integer indicating the frame at which this
+               transform is applied.
+  @param path a "/"-delimited string indicating the path in the scene tree.
+              See @ref meshcat_path "Meshcat paths" for the semantics.
+  @param object_json a json representation of a THREEjs object serialized using
+                     msgpack.
+
+  */
+  void SetObject(int frame, std::string_view path, std::string object_json);
+
   // TODO(russt): Consider ColorKeyframeTrack.js and/or StringKeyframeTrack.js
 
   // TODO(russt): Possibly support interpolation modes and ending modes from
@@ -200,7 +212,7 @@ class MeshcatAnimation {
   // All property values in a track must be the same type.
   struct TypedTrack {
     std::variant<std::monostate, Track<bool>, Track<double>,
-                 Track<std::vector<double>>>
+                 Track<std::vector<double>>, Track<std::string>>
         track;
     std::string js_type;
   };
@@ -223,7 +235,7 @@ class MeshcatAnimation {
   // js_type must match three.js getTrackTypeForValueTypeName implementation.
   template <typename T>
   void SetProperty(int frame, std::string_view path, std::string_view property,
-                   std::string_view js_type, const T& value);
+                   std::string_view js_type, T value);
 
   // A map of path name => property tracks.
   PathTracks path_tracks_{};
