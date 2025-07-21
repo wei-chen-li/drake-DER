@@ -141,6 +141,7 @@ systems::EventStatus MeshcatVisualizer<T>::UpdateMeshcat(
     version_ = current_version;
   }
   SetTransforms(context, query_object);
+  SetDeformables(context, query_object);
   if (params_.enable_alpha_slider) {
     double new_alpha_value = meshcat_->GetSliderValue(alpha_slider_name_);
     if (new_alpha_value != alpha_value_) {
@@ -290,6 +291,69 @@ void MeshcatVisualizer<T>::SetAlphas(bool initializing) const {
     // requires that all object instantiations are complete in the visualizer
     // instance.
     meshcat_->SetProperty(params_.prefix, "modulated_opacity", alpha_value_);
+  }
+}
+
+template <typename T>
+void MeshcatVisualizer<T>::SetDeformables(
+    const systems::Context<T>& context,
+    const QueryObject<T>& query_object) const {
+  const SceneGraphInspector<T>& inspector = query_object.inspector();
+  for (const GeometryId geom_id : inspector.GetAllDeformableGeometryIds()) {
+    // If the geometry doesn't have the role that the visualizer wants to
+    // visualize, skip it.
+    if (inspector.GetProperties(geom_id, params_.role) == nullptr) {
+      continue;
+    }
+    // For a given geometry, if the property (meshcat, accepting) exists then
+    // the visualizer will show the geometry only if the property's value
+    // matches our prefix. If that property is absent then the geometry will be
+    // shown only if include_unspecified_accepting is true.
+    const GeometryProperties& properties =
+        *inspector.GetProperties(geom_id, params_.role);
+    if (properties.HasProperty("meshcat", "accepting")) {
+      if (properties.GetProperty<std::string>("meshcat", "accepting") !=
+          params_.prefix) {
+        continue;
+      }
+    } else if (!params_.include_unspecified_accepting) {
+      continue;
+    }
+
+    // We'll turn scoped names into meshcat paths.
+    const std::string geometry_name =
+        internal::TransformGeometryName(geom_id, inspector);
+    const std::string path =
+        fmt::format("{}/{}", params_.prefix, geometry_name);
+
+    // Get the render mesh and mesh vertices positions.
+    const std::vector<internal::RenderMesh>& render_meshes =
+        inspector.GetDrivenRenderMeshes(geom_id, params_.role);
+    const std::vector<VectorX<T>> vertex_positions =
+        query_object.GetDrivenMeshConfigurationsInWorld(geom_id, params_.role);
+    DRAKE_DEMAND(ssize(vertex_positions) == ssize(render_meshes));
+    if (render_meshes.empty()) continue;
+
+    // There is typically only one render mesh and its associated vertex
+    // positions.
+    const Eigen::VectorXd vertices = ExtractDoubleOrThrow(vertex_positions[0]);
+    const Eigen::Matrix<unsigned int, Eigen::Dynamic, 3, Eigen::RowMajor>&
+        faces = render_meshes[0].indices;
+
+    const Rgba& rgba = render_meshes[0].material.has_value()
+                           ? render_meshes[0].material->diffuse
+                           : params_.default_color;
+
+    meshcat_->SetTransform(path, math::RigidTransformd());
+    meshcat_->SetTriangleMesh(path,
+                              Eigen::Map<const Eigen::Matrix3Xd>(
+                                  vertices.data(), 3, ssize(vertices) / 3),
+                              faces.cast<int>().transpose(), rgba,
+                              /* wireframe = */ false,
+                              /* wireframe_line_width = */ 1.0,
+                              Meshcat::kDoubleSide,
+                              ExtractDoubleOrThrow(context.get_time()));
+    geometries_[geom_id] = path;
   }
 }
 

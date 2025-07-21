@@ -2605,7 +2605,8 @@ void Meshcat::SetLineSegments(std::string_view path,
 void Meshcat::SetTriangleMesh(
     std::string_view path, const Eigen::Ref<const Eigen::Matrix3Xd>& vertices,
     const Eigen::Ref<const Eigen::Matrix3Xi>& faces, const Rgba& rgba,
-    bool wireframe, double wireframe_line_width, SideOfFaceToRender side) {
+    bool wireframe, double wireframe_line_width, SideOfFaceToRender side,
+    std::optional<double> time_in_recording) {
   impl().SetTriangleMesh(path, vertices, faces, rgba, wireframe,
                          wireframe_line_width, side);
 }

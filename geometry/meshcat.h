@@ -285,7 +285,8 @@ class Meshcat {
                        const Rgba& rgba = Rgba(0.1, 0.1, 0.1, 1.0),
                        bool wireframe = false,
                        double wireframe_line_width = 1.0,
-                       SideOfFaceToRender side = kDoubleSide);
+                       SideOfFaceToRender side = kDoubleSide,
+                       std::optional<double> time_in_recording = std::nullopt);
 
   /** Sets the "object" at `path` in the scene tree to a triangular mesh with
   per-vertex coloring.
