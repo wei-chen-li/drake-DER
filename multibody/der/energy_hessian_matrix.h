@@ -142,6 +142,7 @@ class EnergyHessianMatrixLinearSolver {
   /* Solves A x = b. Returns false if factorization of A fails.
    @pre `A.rows() == num_dofs_`.
    @pre `b.size() == num_dofs_`.
+   @pre `x != nullptr`.
    @pre `x->size() == num_dofs_`. */
   [[nodiscard]] bool Solve(const EnergyHessianMatrix<T>& A,
                            const Eigen::Ref<const VectorX<T>> b,

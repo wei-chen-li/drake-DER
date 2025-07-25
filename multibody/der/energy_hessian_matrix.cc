@@ -314,6 +314,7 @@ bool EnergyHessianMatrixLinearSolver<T>::Solve(
     EigenPtr<VectorX<T>> x) {
   DRAKE_THROW_UNLESS(A.rows() == num_dofs_);
   DRAKE_THROW_UNLESS(b.size() == num_dofs_);
+  DRAKE_THROW_UNLESS(x != nullptr);
   DRAKE_THROW_UNLESS(x->size() == num_dofs_);
   ldlt_solver_.UpdateMatrix(A.data_);
   bool success = ldlt_solver_.Factor();
