@@ -113,12 +113,13 @@ class DerModel {
 
     /** Sets the undeformed curvatures and twists to zero; the undeformed edge
      lengths are computed from the current node positions. */
-    void SetZeroUndeformedCurvatureAndTwist();
+    void SetUndeformedZeroCurvatureAndZeroTwist();
 
-    /** Sets the undeformed edge lengths, curvatures, and twists based on the
-     currently specified node positions and edge angles. Effectively, the
-     undeformed state matches the initial state. */
-    void SetUndeformedStateToInitialState();
+    /** Sets the undeformed edge lengths from the current node positions and set
+     the undeformed twists to zero. Furthermore, if the DER has open ends, set
+     the curvature to zero; is the DER has closed ends, set the curvature to
+     that of a circle.  */
+    void SetUndeformedNaturalCurvatureAndZeroTwist();
     // @}
 
     /** @{

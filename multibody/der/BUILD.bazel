@@ -138,6 +138,8 @@ drake_cc_library(
     hdrs = ["der_undeformed_state.h"],
     deps = [
         ":der_state",
+        "//solvers:mathematical_program",
+        "//solvers:solve",
     ],
 )
 
@@ -293,6 +295,7 @@ drake_cc_googletest(
 drake_cc_googletest(
     name = "der_undeformed_state_test",
     deps = [
+        ":der_state",
         ":der_undeformed_state",
         "//common/test_utilities:eigen_matrix_compare",
     ],

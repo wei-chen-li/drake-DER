@@ -4,6 +4,7 @@
 
 #include "drake/common/autodiff.h"
 #include "drake/common/test_utilities/eigen_matrix_compare.h"
+#include "drake/multibody/der/der_state.h"
 
 namespace drake {
 namespace multibody {
@@ -11,6 +12,7 @@ namespace der {
 namespace {
 
 using Eigen::RowVectorXd;
+using Eigen::Vector3d;
 
 class DerUndeformedStateTest : public ::testing::TestWithParam<bool> {};
 
@@ -64,6 +66,52 @@ TEST_P(DerUndeformedStateTest, ZeroCurvatureAndTwist) {
   EXPECT_TRUE(CompareMatrices(undeformed.get_curvature_kappa1(), zero));
   EXPECT_TRUE(CompareMatrices(undeformed.get_curvature_kappa2(), zero));
   EXPECT_TRUE(CompareMatrices(undeformed.get_twist(), zero));
+}
+
+TEST_P(DerUndeformedStateTest, NaturalCurvatureZeroTwist) {
+  const bool has_closed_ends = GetParam();
+  const int num_nodes = 8;
+  const int num_edges = has_closed_ends ? num_nodes : num_nodes - 1;
+  const int num_internal_nodes = has_closed_ends ? num_nodes : num_nodes - 2;
+
+  const double a = 1.0;
+  std::vector<Vector3d> node_positions = {
+      Vector3d(-a, -a, 0), Vector3d(0, -a, 0), Vector3d(a, -a, 0),
+      Vector3d(a, 0, 0),   Vector3d(a, a, 0),  Vector3d(0, a, 0),
+      Vector3d(-a, a, 0),  Vector3d(-a, 0, 0),
+  };
+  std::vector<double> edge_angles(num_edges, 0.0);
+  Vector3d d1_0(0, 1.0 / 2, sqrt(3) / 2);
+
+  const internal::DerStateSystem<double> der_state_system(
+      has_closed_ends, node_positions, edge_angles, d1_0);
+  const internal::DerState<double> der_state(&der_state_system);
+  const DerUndeformedState<double> undeformed =
+      DerUndeformedState<double>::NaturalCurvatureZeroTwist(der_state);
+
+  if (!has_closed_ends) {
+    EXPECT_TRUE(CompareMatrices(undeformed.get_edge_length(),
+                                RowVectorXd::Constant(num_edges, a)));
+    const auto zero = RowVectorXd::Zero(num_internal_nodes);
+    EXPECT_TRUE(CompareMatrices(undeformed.get_curvature_kappa1(), zero));
+    EXPECT_TRUE(CompareMatrices(undeformed.get_curvature_kappa2(), zero));
+    EXPECT_TRUE(CompareMatrices(undeformed.get_twist(), zero));
+  } else {
+    EXPECT_TRUE(CompareMatrices(undeformed.get_edge_length(),
+                                RowVectorXd::Constant(num_edges, a)));
+    EXPECT_TRUE(CompareMatrices(undeformed.get_twist(),
+                                RowVectorXd::Zero(num_internal_nodes)));
+
+    const double angle = (2 * M_PI) / num_edges;
+    const double kappa = 2 * tan(angle / 2);
+    constexpr double kTol = 1e-15;
+    EXPECT_TRUE(CompareMatrices(
+        undeformed.get_curvature_kappa1(),
+        RowVectorXd::Constant(num_edges, kappa * (1.0 / 2)), kTol));
+    EXPECT_TRUE(CompareMatrices(
+        undeformed.get_curvature_kappa2(),
+        RowVectorXd::Constant(num_edges, kappa * (-sqrt(3) / 2)), kTol));
+  }
 }
 
 TEST_P(DerUndeformedStateTest, set_edge_length) {

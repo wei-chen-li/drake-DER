@@ -36,9 +36,10 @@ class DerUndeformedState {
       bool has_closed_ends,
       const Eigen::Ref<const Eigen::RowVectorX<T>>& edge_length);
 
-  /** Creates an undeformed state from the `state`'s current edge length,
-   curvature, and twist. */
-  static DerUndeformedState<T> FromCurrentDerState(
+  /** Creates an undeformed state from the `state`'s current edge length and
+   zero twist. Furthermore, the curvature is set to zero if the DER has open
+   ends; set to that of a circle if the DER has closed ends. */
+  static DerUndeformedState<T> NaturalCurvatureZeroTwist(
       const internal::DerState<T>& state);
 
   bool has_closed_ends() const { return has_closed_ends_; }
@@ -89,7 +90,7 @@ class DerUndeformedState {
   /** Sets the undeformed curvature components from the angle values.
    Equivalent to `set_curvature_kappa(2*tan(angle1/2), 2*tan(angle2/2))`
    @pre `angle1.size() == num_internal_nodes()`.
-   @pre `angle1.size() == num_internal_nodes()`.
+   @pre `angle2.size() == num_internal_nodes()`.
    @pre Entries in `angle1` and `angle2` are all within the range (-2π, 2π). */
   void set_curvature_angle(
       const Eigen::Ref<const Eigen::RowVectorX<T>>& angle1,

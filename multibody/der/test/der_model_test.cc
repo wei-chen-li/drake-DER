@@ -45,7 +45,7 @@ using Eigen::VectorXd;
 using test::LimitMalloc;
 
 enum RodConfigurationTests { kOpenEnds, kClosedEnds };
-enum UndeformedStateTests { kZeroCurvatureTwist, kSameAsInitialState };
+enum UndeformedStateTests { kZeroCurvatureTwist, kNaturalCurvature };
 enum CrossSectionTests { kCircular, kRectangular, kElliptical };
 enum DampingCoefficientTests { kZeroDamping, kNonZeroDamping };
 
@@ -144,9 +144,9 @@ class DerModelBuilderTest
   void AddUndeformedState() {
     UndeformedStateTests opt = std::get<1>(GetParam());
     if (opt == kZeroCurvatureTwist) {
-      builder_->SetZeroUndeformedCurvatureAndTwist();
-    } else if (opt == kSameAsInitialState) {
-      builder_->SetUndeformedStateToInitialState();
+      builder_->SetUndeformedZeroCurvatureAndZeroTwist();
+    } else if (opt == kNaturalCurvature) {
+      builder_->SetUndeformedNaturalCurvatureAndZeroTwist();
     }
   }
 
@@ -164,14 +164,11 @@ class DerModelBuilderTest
       EXPECT_TRUE(CompareMatrices(undeformed.get_curvature_kappa1(), zero));
       EXPECT_TRUE(CompareMatrices(undeformed.get_curvature_kappa2(), zero));
       EXPECT_TRUE(CompareMatrices(undeformed.get_twist(), zero));
-    } else if (opt == kSameAsInitialState) {
+    } else if (opt == kNaturalCurvature) {
       EXPECT_TRUE(CompareMatrices(undeformed.get_edge_length(),
                                   state->get_edge_length()));
-      EXPECT_TRUE(CompareMatrices(undeformed.get_curvature_kappa1(),
-                                  state->get_curvature_kappa1()));
-      EXPECT_TRUE(CompareMatrices(undeformed.get_curvature_kappa2(),
-                                  state->get_curvature_kappa2()));
-      EXPECT_TRUE(CompareMatrices(undeformed.get_twist(), state->get_twist()));
+      auto zero = Eigen::RowVectorXd::Zero(state->num_internal_nodes());
+      EXPECT_TRUE(CompareMatrices(undeformed.get_twist(), zero));
     }
   }
 
@@ -257,7 +254,7 @@ INSTANTIATE_TEST_SUITE_P(
     AllCombinations, DerModelBuilderTest,
     ::testing::Combine(::testing::Values(kOpenEnds, kClosedEnds),
                        ::testing::Values(kZeroCurvatureTwist,
-                                         kSameAsInitialState),
+                                         kNaturalCurvature),
                        ::testing::Values(kCircular, kRectangular, kElliptical),
                        ::testing::Values(kZeroDamping, kNonZeroDamping)));
 
@@ -287,7 +284,7 @@ class DerModelTest : public ::testing::TestWithParam<std::tuple<bool, bool>> {
       builder.AddEdge(0.1, Vector3d(l, l, l * 1.5));
       builder.AddEdge(0.2, Vector3d(0, l, l * 3.0));
     }
-    builder.SetZeroUndeformedCurvatureAndTwist();
+    builder.SetUndeformedZeroCurvatureAndZeroTwist();
     const auto [E, G, rho] = std::make_tuple(3e9, 0.8e9, 910);
     builder.SetMaterialProperties(E, G, rho);
     const auto [width, height] = std::make_tuple(1.38e-3, 6e-3);

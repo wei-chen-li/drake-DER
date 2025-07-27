@@ -600,7 +600,7 @@ DeformableBody<T>::BuildFilamentDerModel(
     builder.AddEdge(gamma_i, node_pos.col(ip1));
   }
 
-  builder.SetUndeformedStateToInitialState();
+  builder.SetUndeformedNaturalCurvatureAndZeroTwist();
 
   const T E = config.youngs_modulus();
   const T G = E / (2 * (1 + config.poissons_ratio()));

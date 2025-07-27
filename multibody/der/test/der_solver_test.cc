@@ -76,7 +76,7 @@ class DerSolverTest : public ::testing::TestWithParam<bool> {
       builder.AddEdge(0.2, Vector3d(0, l, l * 3.0));
     }
 
-    builder.SetZeroUndeformedCurvatureAndTwist();
+    builder.SetUndeformedZeroCurvatureAndZeroTwist();
     const auto [E, G, rho] = std::make_tuple(3e9, 0.8e9, 910);
     builder.SetMaterialProperties(E, G, rho);
     const double radius = 1e-3;
@@ -185,7 +185,7 @@ class DerSolverCantileverBeamTest : public ::testing::TestWithParam<int> {
     for (int i = 2; i < kNumNodes; ++i) {
       builder.AddEdge(0, Vector3d(dx * i, 0, 0));
     }
-    builder.SetZeroUndeformedCurvatureAndTwist();
+    builder.SetUndeformedZeroCurvatureAndZeroTwist();
     builder.SetMaterialProperties(kE, kG, kRho);
     builder.SetRectangularCrossSection(kWidth, kHeight);
     builder.SetDampingCoefficients(0.0, 0.0);

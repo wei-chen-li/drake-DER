@@ -57,7 +57,7 @@ std::tuple<DerEdgeIndex, DerNodeIndex> DerModel<T>::Builder::AddEdge(
 }
 
 template <typename T>
-void DerModel<T>::Builder::SetZeroUndeformedCurvatureAndTwist() {
+void DerModel<T>::Builder::SetUndeformedZeroCurvatureAndZeroTwist() {
   if (is_built_) throw std::logic_error("The DER model is already build.");
   if (der_undeformed_state_)
     throw std::logic_error("The undeformed state is already set.");
@@ -75,7 +75,7 @@ void DerModel<T>::Builder::SetZeroUndeformedCurvatureAndTwist() {
 }
 
 template <typename T>
-void DerModel<T>::Builder::SetUndeformedStateToInitialState() {
+void DerModel<T>::Builder::SetUndeformedNaturalCurvatureAndZeroTwist() {
   if (is_built_) throw std::logic_error("The DER model is already build.");
   if (der_undeformed_state_)
     throw std::logic_error("The undeformed state is already set.");
@@ -85,7 +85,8 @@ void DerModel<T>::Builder::SetUndeformedStateToInitialState() {
       has_closed_ends_, node_positions_, edge_angles_, d1_0_);
   internal::DerState<T> der_state(&der_state_system);
 
-  der_undeformed_state_ = DerUndeformedState<T>::FromCurrentDerState(der_state);
+  der_undeformed_state_ =
+      DerUndeformedState<T>::NaturalCurvatureZeroTwist(der_state);
 }
 
 template <typename T>
