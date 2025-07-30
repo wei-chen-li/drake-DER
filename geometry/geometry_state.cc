@@ -1735,8 +1735,9 @@ template <typename T>
 void GeometryState<T>::ApplyProximityDefaults(
     const DefaultProximityProperties& defaults, GeometryId geometry_id) {
   // TODO(#20820) Maybe this can be removed later.
-  // Leave deformables untouched.
-  if (IsDeformableGeometry(geometry_id)) {
+  // Leave mesh deformables untouched.
+  const InternalGeometry& geometry = GetValueOrThrow(geometry_id, geometries_);
+  if (geometry.reference_mesh() != nullptr) {
     return;
   }
 

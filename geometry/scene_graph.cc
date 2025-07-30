@@ -338,8 +338,15 @@ GeometryId SceneGraph<T>::RegisterDeformableGeometry(
     Context<T>* context, SourceId source_id, FrameId frame_id,
     std::unique_ptr<GeometryInstance> geometry, double resolution_hint) const {
   auto& g_state = mutable_geometry_state(context);
-  return g_state.RegisterDeformableGeometry(
+  bool has_proximity = (geometry->proximity_properties() != nullptr);
+  auto geometry_id = g_state.RegisterDeformableGeometry(
       source_id, frame_id, std::move(geometry), resolution_hint);
+  if (has_proximity) {
+    const auto& config = get_config(*context);
+    g_state.ApplyProximityDefaults(config.default_proximity_properties,
+                                   geometry_id);
+  }
+  return geometry_id;
 }
 
 template <typename T>

@@ -455,6 +455,7 @@ class ProximityEngine<T>::Impl : public ShapeReifier {
       const Filament* filament = geometry.reference_filament();
       DRAKE_THROW_UNLESS(filament != nullptr);
       filament_geometries_.AddFilamentGeometry(id, *filament, new_properties);
+      return;
     }
 
     // We'll simply mindlessly destroy and recreate the hydroelastic and

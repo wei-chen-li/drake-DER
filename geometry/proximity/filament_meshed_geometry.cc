@@ -296,7 +296,14 @@ void Append(const Eigen::Matrix3X<T>& new_vertices,
 
 std::optional<FilamentHydroelasticParameters>
 FilamentHydroelasticParameters::Parse(const ProximityProperties& props) {
-  if (!props.HasGroup(kHydroGroup)) return std::nullopt;
+  if (!props.HasGroup(kHydroGroup)) {
+    return std::nullopt;
+  }
+  if (props.HasProperty(kHydroGroup, kComplianceType) &&
+      props.GetProperty<HydroelasticType>(kHydroGroup, kComplianceType) ==
+          HydroelasticType::kUndefined) {
+    return std::nullopt;
+  }
 
   const HydroelasticType compliance_type = props.GetPropertyOrDefault(
       kHydroGroup, kComplianceType, HydroelasticType::kCompliant);
