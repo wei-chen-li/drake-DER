@@ -452,4 +452,5 @@ class TestDiffIkSystems(unittest.TestCase):
         context = dut.CreateDefaultContext()
 
         positions = [0] * diff_ik_sys.plant().num_positions()
+        dut.SetInitialPositions(value=positions)
         dut.set_initial_position(context=context, value=positions)

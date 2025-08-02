@@ -61,6 +61,12 @@ class DifferentialInverseKinematicsController final
 
   ~DifferentialInverseKinematicsController() final;
 
+  /** Sets the initial value of the DiscreteTimeIntegrator to `value`. `value`
+  has the dimension of the full `plant.num_positions()`; non-active dofs will be
+  ignored. This in effect sets the initial position that is fed to the
+  DifferentialInverseKinematicsSystem leaf system. */
+  void SetInitialPositions(const Eigen::Ref<const Eigen::VectorXd>& value);
+
   /** Sets the integral part of the DiscreteTimeIntegrator to `value`. `value`
   has the dimension of the full `plant.num_positions()`; non-active dofs will be
   ignored. This in effect sets the initial position that is fed to the
@@ -94,6 +100,7 @@ class DifferentialInverseKinematicsController final
   DifferentialInverseKinematicsSystem* differential_inverse_kinematics_{
       nullptr};
   systems::DiscreteTimeIntegrator<double>* discrete_time_integrator_{nullptr};
+  std::optional<Eigen::VectorXd> initial_positions_;
 };
 
 }  // namespace multibody

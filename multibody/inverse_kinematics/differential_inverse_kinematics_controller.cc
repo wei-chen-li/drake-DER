@@ -111,6 +111,13 @@ DifferentialInverseKinematicsController::
 DifferentialInverseKinematicsController::
     ~DifferentialInverseKinematicsController() = default;
 
+void DifferentialInverseKinematicsController::SetInitialPositions(
+    const Eigen::Ref<const Eigen::VectorXd>& value) {
+  DRAKE_THROW_UNLESS(value.size() ==
+                     differential_inverse_kinematics_->plant().num_positions());
+  initial_positions_ = value;
+}
+
 void DifferentialInverseKinematicsController::set_initial_position(
     Context<double>* context, const Eigen::Ref<const VectorXd>& value) const {
   Context<double>& discrete_time_integrator_context =
@@ -126,7 +133,14 @@ void DifferentialInverseKinematicsController::set_initial_position(
 void DifferentialInverseKinematicsController::SetDefaultState(
     const Context<double>& context, State<double>* state) const {
   Base::SetDefaultState(context, state);
-  set_state_to_nan(context, state);
+  if (!initial_positions_.has_value()) {
+    set_state_to_nan(context, state);
+  } else {
+    const DofMask& active_dof = differential_inverse_kinematics_->active_dof();
+    GetMutableSubsystemState(*discrete_time_integrator_, state)
+        .get_mutable_discrete_state(0)
+        .SetFromVector(active_dof.GetFromArray(*initial_positions_));
+  }
 }
 
 void DifferentialInverseKinematicsController::SetRandomState(

@@ -428,6 +428,8 @@ void DefineDifferentialIkController(py::module m) {
       }),
           py::arg("differential_inverse_kinematics"),
           py::arg("planar_rotation_dof_indices"), cls_doc.ctor.doc)
+      .def("SetInitialPositions", &Class::SetInitialPositions, py::arg("value"),
+          cls_doc.SetInitialPositions.doc)
       .def("set_initial_position", &Class::set_initial_position,
           py::arg("context"), py::arg("value"),
           cls_doc.set_initial_position.doc)
