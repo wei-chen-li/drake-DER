@@ -234,9 +234,9 @@ class DerModel {
    @param[in] scratch The scratch allocated using MakeScratch().
    @returns The residual vector.
 
-   @pre `state` is allocated using CreateDerState() of the same DerModel.
+   @pre `state` is allocated using CreateDerState() of this DerModel.
    @pre `scratch != nullptr`.
-   @pre `scratch` is allocated using MakeScratch() of the same DerModel. */
+   @pre `scratch` is allocated using MakeScratch() of this DerModel. */
   const Eigen::VectorX<T>& ComputeResidual(
       const internal::DerState<T>& state,
       const internal::ExternalForceField<T>& external_force_field,
@@ -258,17 +258,32 @@ class DerModel {
    @return `result` The tangent matrix represented by a
    Block4x4SparseSymmetricMatrix.
 
-   @pre `state` is allocated using CreateDerState() of the same DerModel.
+   @pre `state` is allocated using CreateDerState() of this DerModel.
    @pre `scratch != nullptr`.
-   @pre `scratch` is allocated using MakeScratch() of the same DerModel. */
+   @pre `scratch` is allocated using MakeScratch() of this DerModel. */
   const internal::EnergyHessianMatrix<T>& ComputeTangentMatrix(
       const internal::DerState<T>& state, const std::array<T, 3>& weights,
       Scratch* scratch) const;
 
   /** Applies the boundary condition for this DerModel to the `state`.
    @pre `state != nullptr`.
-   @pre `state` is allocated using CreateDerState() of the same DerModel. */
+   @pre `state` is allocated using CreateDerState() of this DerModel. */
   void ApplyBoundaryCondition(internal::DerState<T>* state) const;
+
+  /** Computes the position of the center of mass.
+   @pre `state` is allocated using CreateDerState() of this DerModel. */
+  Eigen::Vector3<T> ComputeCenterOfMassPosition(
+      const internal::DerState<T>& state) const;
+
+  /** Computes the translational velocity of the center of mass.
+   @pre `state` is allocated using CreateDerState() of this DerModel. */
+  Eigen::Vector3<T> ComputeCenterOfMassTranslationalVelocity(
+      const internal::DerState<T>& state) const;
+
+  /** Computes the angular velocity about the center of mass.
+   @pre `state` is allocated using CreateDerState() of this DerModel. */
+  Eigen::Vector3<T> ComputeEffectiveAngularVelocity(
+      const internal::DerState<T>& state) const;
 
   /** Creates a deep copy of this DerModel. Even though the cloned model is
    functionally identical, any DerState and Scratch created for this model are

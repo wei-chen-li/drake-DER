@@ -396,6 +396,83 @@ void DerModel<T>::ApplyBoundaryCondition(internal::DerState<T>* state) const {
 }
 
 template <typename T>
+Eigen::RowVectorX<T> NodeRelativeMass(const DerUndeformedState<T>& undeformed) {
+  Eigen::RowVectorX<T> relative_mass =
+      Eigen::RowVectorX<T>::Zero(undeformed.num_nodes());
+  const auto& l_undeformed = undeformed.get_edge_length();
+  const int num_edges = undeformed.num_edges();
+  /* The mass assiciated with a node is half the total mass of the adjacent
+   rod(s). Two rods if the node is on the internal, only one rod if the DER has
+   open-ends and the node is on either end. */
+  for (int i = 0; i < undeformed.num_nodes(); ++i) {
+    if (undeformed.has_closed_ends()) {
+      const int im1 = (i - 1 + num_edges) % num_edges;
+      relative_mass[i] = 0.5 * (l_undeformed[im1] + l_undeformed[i]);
+    } else {
+      if (i - 1 >= 0) relative_mass[i] += 0.5 * l_undeformed[i - 1];
+      if (i < num_edges) relative_mass[i] += 0.5 * l_undeformed[i];
+    }
+  }
+  return relative_mass;
+}
+
+template <typename T>
+Eigen::Vector3<T> DerModel<T>::ComputeCenterOfMassPosition(
+    const internal::DerState<T>& state) const {
+  this->ValidateDerState(state);
+  const auto& q = state.get_position();
+  const auto mass = NodeRelativeMass(der_undeformed_state_);
+
+  Vector3<T> p_WBcm = Vector3<T>::Zero();
+  for (int i = 0; i < num_nodes(); ++i) {
+    const Vector3<T> p_WQ = q.template segment<3>(4 * i);
+    p_WBcm += p_WQ * mass[i];
+  }
+  p_WBcm /= mass.sum();
+  return p_WBcm;
+}
+
+template <typename T>
+Eigen::Vector3<T> DerModel<T>::ComputeCenterOfMassTranslationalVelocity(
+    const internal::DerState<T>& state) const {
+  this->ValidateDerState(state);
+  const auto& qdot = state.get_velocity();
+  const auto mass = NodeRelativeMass(der_undeformed_state_);
+
+  Vector3<T> v_WBcm = Vector3<T>::Zero();
+  for (int i = 0; i < num_nodes(); ++i) {
+    const Vector3<T> v_WQ = qdot.template segment<3>(4 * i);
+    v_WBcm += v_WQ * mass[i];
+  }
+  v_WBcm /= mass.sum();
+  return v_WBcm;
+}
+
+template <typename T>
+Eigen::Vector3<T> DerModel<T>::ComputeEffectiveAngularVelocity(
+    const internal::DerState<T>& state) const {
+  this->ValidateDerState(state);
+  const Vector3<T> p_WBcm = ComputeCenterOfMassPosition(state);
+  const auto& q = state.get_position();
+  const auto& qdot = state.get_velocity();
+  const auto mass = NodeRelativeMass(der_undeformed_state_);
+
+  Matrix3<T> I_BBcm_W = Matrix3<T>::Zero();
+  Vector3<T> H_WBcm_W = Vector3<T>::Zero();
+  for (int i = 0; i < num_nodes(); ++i) {
+    const Vector3<T> p_WQ = q.template segment<3>(4 * i);
+    const Vector3<T> p_BcmQ = p_WQ - p_WBcm;
+    const Vector3<T> v_WQ = qdot.template segment<3>(4 * i);
+    I_BBcm_W += (p_BcmQ.dot(p_BcmQ) * Matrix3<T>::Identity() -
+                 p_BcmQ * p_BcmQ.transpose()) *
+                mass[i];
+    H_WBcm_W += p_BcmQ.cross(v_WQ) * mass[i];
+  }
+  Vector3<T> w_WBcm_W = I_BBcm_W.llt().solve(H_WBcm_W);
+  return w_WBcm_W;
+}
+
+template <typename T>
 std::unique_ptr<DerModel<T>> DerModel<T>::Clone() const {
   return std::unique_ptr<DerModel<T>>(
       new DerModel<T>(dynamic_pointer_cast<internal::DerStateSystem<T>>(
