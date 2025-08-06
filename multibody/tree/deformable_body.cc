@@ -164,6 +164,7 @@ MultibodyConstraintId DeformableBody<T>::AddFixedConstraint(
       }
     }
     /* If node i and node i+1 are fixed, also fix edge i. */
+    // TODO(wei-chen): Enable edges for fixed constraints.
     /*
     for (int k = 0; k < ssize(spec.nodes); ++k) {
       const int i = spec.nodes[k];
@@ -198,20 +199,19 @@ void DeformableBody<T>::SetPositions(
     const Eigen::Ref<const Matrix3X<T>>& q) const {
   DRAKE_THROW_UNLESS(context != nullptr);
   this->GetParentTreeSystem().ValidateContext(*context);
-  if (fem_model_) {
-    const int num_nodes = fem_model_->num_nodes();
-    DRAKE_THROW_UNLESS(q.cols() == num_nodes);
-    auto all_finite = [](const Matrix3X<T>& positions) {
-      return positions.array().isFinite().all();
-    };
-    DRAKE_THROW_UNLESS(all_finite(q));
+  const int num_nodes =
+      fem_model_ ? fem_model_->num_nodes() : der_model_->num_nodes();
+  DRAKE_THROW_UNLESS(q.cols() == num_nodes);
+  auto all_finite = [](const Matrix3X<T>& positions) {
+    return positions.array().isFinite().all();
+  };
+  DRAKE_THROW_UNLESS(all_finite(q));
 
+  if (fem_model_) {
     context->get_mutable_discrete_state(discrete_state_index_)
         .get_mutable_value()
         .head(num_nodes * 3) = Eigen::Map<const VectorX<T>>(q.data(), q.size());
   } else if (der_model_) {
-    const int num_nodes = der_model_->num_nodes();
-    DRAKE_THROW_UNLESS(q.cols() == num_nodes);
     Eigen::VectorBlock<VectorX<T>> discrete_state_vector =
         context->get_mutable_discrete_state(discrete_state_index_)
             .get_mutable_value();
@@ -228,18 +228,30 @@ void DeformableBody<T>::SetVelocities(
     const Eigen::Ref<const Matrix3X<T>>& v) const {
   DRAKE_THROW_UNLESS(context != nullptr);
   this->GetParentTreeSystem().ValidateContext(*context);
-  const int num_nodes = fem_model_->num_nodes();
+  const int num_nodes =
+      fem_model_ ? fem_model_->num_nodes() : der_model_->num_nodes();
   DRAKE_THROW_UNLESS(v.cols() == num_nodes);
   auto all_finite = [](const Matrix3X<T>& velocities) {
     return velocities.array().isFinite().all();
   };
   DRAKE_THROW_UNLESS(all_finite(v));
 
-  const int num_dofs = num_nodes * 3;
-  context->get_mutable_discrete_state(discrete_state_index_)
-      .get_mutable_value()
-      .segment(num_dofs, num_dofs) =
-      Eigen::Map<const VectorX<T>>(v.data(), v.size());
+  if (fem_model_) {
+    const int num_dofs = num_nodes * 3;
+    context->get_mutable_discrete_state(discrete_state_index_)
+        .get_mutable_value()
+        .segment(num_dofs, num_dofs) =
+        Eigen::Map<const VectorX<T>>(v.data(), v.size());
+  } else if (der_model_) {
+    Eigen::VectorBlock<VectorX<T>> discrete_state_vector =
+        context->get_mutable_discrete_state(discrete_state_index_)
+            .get_mutable_value();
+    const int offset = der_model_->num_dofs();
+    for (int i = 0; i < num_nodes; ++i)
+      discrete_state_vector.template segment<3>(offset + 4 * i) = v.col(i);
+  } else {
+    DRAKE_UNREACHABLE();
+  }
 }
 
 template <typename T>
@@ -248,7 +260,8 @@ void DeformableBody<T>::SetPositionsAndVelocities(
     const Eigen::Ref<const Matrix3X<T>>& v) const {
   DRAKE_THROW_UNLESS(context != nullptr);
   this->GetParentTreeSystem().ValidateContext(*context);
-  const int num_nodes = fem_model_->num_nodes();
+  const int num_nodes =
+      fem_model_ ? fem_model_->num_nodes() : der_model_->num_nodes();
   DRAKE_THROW_UNLESS(q.cols() == num_nodes);
   DRAKE_THROW_UNLESS(v.cols() == num_nodes);
   auto all_finite = [](const auto& mat) {
@@ -257,13 +270,27 @@ void DeformableBody<T>::SetPositionsAndVelocities(
   DRAKE_THROW_UNLESS(all_finite(q));
   DRAKE_THROW_UNLESS(all_finite(v));
 
-  const int num_dofs = num_nodes * 3;
-  Eigen::VectorBlock<VectorX<T>> state_value =
-      context->get_mutable_discrete_state(discrete_state_index_)
-          .get_mutable_value();
-  state_value.head(num_dofs) = Eigen::Map<const VectorX<T>>(q.data(), q.size());
-  state_value.segment(num_dofs, num_dofs) =
-      Eigen::Map<const VectorX<T>>(v.data(), v.size());
+  if (fem_model_) {
+    const int num_dofs = num_nodes * 3;
+    Eigen::VectorBlock<VectorX<T>> state_value =
+        context->get_mutable_discrete_state(discrete_state_index_)
+            .get_mutable_value();
+    state_value.head(num_dofs) =
+        Eigen::Map<const VectorX<T>>(q.data(), q.size());
+    state_value.segment(num_dofs, num_dofs) =
+        Eigen::Map<const VectorX<T>>(v.data(), v.size());
+  } else if (der_model_) {
+    Eigen::VectorBlock<VectorX<T>> discrete_state_vector =
+        context->get_mutable_discrete_state(discrete_state_index_)
+            .get_mutable_value();
+    for (int i = 0; i < num_nodes; ++i)
+      discrete_state_vector.template segment<3>(4 * i) = q.col(i);
+    const int offset = der_model_->num_dofs();
+    for (int i = 0; i < num_nodes; ++i)
+      discrete_state_vector.template segment<3>(offset + 4 * i) = v.col(i);
+  } else {
+    DRAKE_UNREACHABLE();
+  }
 }
 
 template <typename T>
@@ -296,30 +323,64 @@ Matrix3X<T> DeformableBody<T>::GetVelocities(
     const systems::Context<T>& context) const {
   this->GetParentTreeSystem().ValidateContext(context);
 
-  const int num_nodes = fem_model_->num_nodes();
-  const int num_dofs = num_nodes * 3;
-  const VectorX<T>& v = context.get_discrete_state(discrete_state_index_)
-                            .get_value()
-                            .segment(num_dofs, num_dofs);
-  return Eigen::Map<const Matrix3X<T>>(v.data(), 3, num_nodes);
+  if (fem_model_) {
+    const int num_nodes = fem_model_->num_nodes();
+    const int num_dofs = num_nodes * 3;
+    const VectorX<T>& v = context.get_discrete_state(discrete_state_index_)
+                              .get_value()
+                              .segment(num_dofs, num_dofs);
+    return Eigen::Map<const Matrix3X<T>>(v.data(), 3, num_nodes);
+  } else if (der_model_) {
+    const VectorX<T>& discrete_state_vector =
+        context.get_discrete_state(discrete_state_index_).get_value();
+    const int num_nodes = der_model_->num_nodes();
+    Matrix3X<T> node_velocities(3, num_nodes);
+    const int offset = der_model_->num_dofs();
+    for (int i = 0; i < num_nodes; ++i) {
+      node_velocities.col(i) =
+          discrete_state_vector.template segment<3>(offset + 4 * i);
+    }
+    return node_velocities;
+  } else {
+    DRAKE_UNREACHABLE();
+  }
 }
 
 template <typename T>
 Matrix3X<T> DeformableBody<T>::GetPositionsAndVelocities(
     const systems::Context<T>& context) const {
   this->GetParentTreeSystem().ValidateContext(context);
-  const int num_nodes = fem_model_->num_nodes();
-  const int num_dofs = num_nodes * 3;
-  const VectorX<T>& state_value =
-      context.get_discrete_state(discrete_state_index_).get_value();
-  const auto& q = state_value.head(num_dofs);
-  const auto& v = state_value.segment(num_dofs, num_dofs);
-  Matrix3X<T> qv(3, 2 * num_nodes);
-  qv.leftCols(num_nodes) =
-      Eigen::Map<const Matrix3X<T>>(q.data(), 3, num_nodes);
-  qv.rightCols(num_nodes) =
-      Eigen::Map<const Matrix3X<T>>(v.data(), 3, num_nodes);
-  return qv;
+
+  if (fem_model_) {
+    const int num_nodes = fem_model_->num_nodes();
+    const int num_dofs = num_nodes * 3;
+    const VectorX<T>& state_value =
+        context.get_discrete_state(discrete_state_index_).get_value();
+    const auto& q = state_value.head(num_dofs);
+    const auto& v = state_value.segment(num_dofs, num_dofs);
+    Matrix3X<T> qv(3, 2 * num_nodes);
+    qv.leftCols(num_nodes) =
+        Eigen::Map<const Matrix3X<T>>(q.data(), 3, num_nodes);
+    qv.rightCols(num_nodes) =
+        Eigen::Map<const Matrix3X<T>>(v.data(), 3, num_nodes);
+    return qv;
+  } else if (der_model_) {
+    const VectorX<T>& discrete_state_vector =
+        context.get_discrete_state(discrete_state_index_).get_value();
+    const int num_nodes = der_model_->num_nodes();
+    Matrix3X<T> node_qv(3, num_nodes * 2);
+    for (int i = 0; i < num_nodes; ++i) {
+      node_qv.col(i) = discrete_state_vector.template segment<3>(4 * i);
+    }
+    const int offset = der_model_->num_dofs();
+    for (int i = 0; i < num_nodes; ++i) {
+      node_qv.col(num_nodes + i) =
+          discrete_state_vector.template segment<3>(offset + 4 * i);
+    }
+    return node_qv;
+  } else {
+    DRAKE_UNREACHABLE();
+  }
 }
 
 template <typename T>

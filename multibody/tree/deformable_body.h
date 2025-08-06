@@ -125,15 +125,17 @@ class DeformableBody final : public MultibodyElement<T> {
     return is_enabled_parameter_index_;
   }
 
-  /** Returns the cache index for the FemState of this deformable body. */
+  /** Returns the cache index for the FemState of this deformable body.
+   @pre `model_type() == kFem`. */
   systems::CacheIndex fem_state_cache_index() const {
-    DRAKE_THROW_UNLESS(fem_model_ != nullptr);
+    DRAKE_THROW_UNLESS(model_type() == kFem);
     return fem_state_cache_index_;
   }
 
-  /** Returns the cache index for the DerState of this deformable body. */
+  /** Returns the cache index for the DerState of this deformable body.
+   @pre `model_type() == kDer`. */
   systems::CacheIndex der_state_cache_index() const {
-    DRAKE_THROW_UNLESS(der_model_ != nullptr);
+    DRAKE_THROW_UNLESS(model_type() == kDer);
     return der_state_cache_index_;
   }
 
