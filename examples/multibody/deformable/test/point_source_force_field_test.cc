@@ -40,18 +40,19 @@ GTEST_TEST(PointSourceForceFieldTest, EvaluateAt) {
   /* Inside the non-zero range. */
   const Vector3d p_CQ1_W = Vector3d(0, 0, 0.1);
   const Vector3d p_WQ1 = p_WC + p_CQ1_W;
+  const Vector3d v_WQ(0, 0, 0);
   Vector3d expected_force =
       -0.1 / max_distance * max_force_density * p_CQ1_W.normalized();
-  EXPECT_TRUE(CompareMatrices(force_field.EvaluateAt(*context, p_WQ1),
+  EXPECT_TRUE(CompareMatrices(force_field.EvaluateAt(*context, p_WQ1, v_WQ),
                               expected_force, 1e-13));
   /* Outside the non-zero range. */
   const Vector3d p_CQ2_W = Vector3d(0, 0, 0.3);
   const Vector3d p_WQ2 = p_WC + p_CQ2_W;
-  EXPECT_TRUE(CompareMatrices(force_field.EvaluateAt(*context, p_WQ2),
+  EXPECT_TRUE(CompareMatrices(force_field.EvaluateAt(*context, p_WQ2, v_WQ),
                               Vector3d::Zero()));
   /* Turn the force off. */
   force_field.maximum_force_density_input_port().FixValue(context.get(), 0.0);
-  EXPECT_TRUE(CompareMatrices(force_field.EvaluateAt(*context, p_WQ1),
+  EXPECT_TRUE(CompareMatrices(force_field.EvaluateAt(*context, p_WQ1, v_WQ),
                               Vector3d::Zero()));
 }
 

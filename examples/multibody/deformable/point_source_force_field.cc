@@ -21,7 +21,8 @@ PointSourceForceField::PointSourceForceField(
 }
 
 Vector3<double> PointSourceForceField::DoEvaluateAt(
-    const Context<double>& context, const Vector3<double>& p_WQ) const {
+    const Context<double>& context, const Vector3<double>& p_WQ,
+    const Vector3<double>&) const {
   const Vector3<double>& p_WC = EvalPointSourceLocation(context);
   Vector3<double> p_QC_W = p_WC - p_WQ;
   const double dist = p_QC_W.norm();

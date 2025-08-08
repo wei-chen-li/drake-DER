@@ -85,6 +85,7 @@ Eigen::Ref<Eigen::VectorX<T>> ExternalForceVector<T>::ScaleAndAddToVector(
   DRAKE_THROW_UNLESS(other->size() == state_->num_dofs());
 
   const auto& q = state_->get_position();
+  const auto& qdot = state_->get_velocity();
   const auto& t = state_->get_tangent();
   const auto& l = state_->get_edge_length();
   const auto& l_undeformed = undeformed_->get_edge_length();
@@ -97,15 +98,26 @@ Eigen::Ref<Eigen::VectorX<T>> ExternalForceVector<T>::ScaleAndAddToVector(
       Eigen::Vector3<T> rod_i_force = Eigen::Vector3<T>::Zero();
       Eigen::Vector3<T> rod_i_moment = Eigen::Vector3<T>::Zero();
       for (const QuadraturePair& pair : GaussQuadrature()) {
-        Eigen::Vector3<T> vec = pair.abscissa * 0.5 * l[i] * t.col(i);
-        Eigen::Vector3<T> point = 0.5 * (q.template segment<3>(4 * i) +
-                                         q.template segment<3>(4 * ip1)) +
-                                  vec;
-        Eigen::Vector3<T> force =
-            force_density_field->EvaluateAt(*plant_context_, point);
+        const double weight0 = (1.0 - pair.abscissa) / 2;
+        const double weight1 = (pair.abscissa + 1.0) / 2;
+        /* Position of quadrature point in world. */
+        const Eigen::Vector3<T> p_WQ =  //
+            q.template segment<3>(4 * i) * weight0 +
+            q.template segment<3>(4 * ip1) * weight1;
+        /* Velocity of quadrature point in world. */
+        const Eigen::Vector3<T> v_WQ =
+            qdot.template segment<3>(4 * i) * weight0 +
+            qdot.template segment<3>(4 * ip1) * weight1;
+        /* Vector from rod center to quadrature point. */
+        const Eigen::Vector3<T> p_RcQ =
+            p_WQ - 0.5 * (q.template segment<3>(4 * i) +
+                          q.template segment<3>(4 * ip1));
+
+        const Eigen::Vector3<T> force =
+            force_density_field->EvaluateAt(*plant_context_, p_WQ, v_WQ);
 
         rod_i_force += pair.weight * force;
-        rod_i_moment += pair.weight * vec.cross(force);
+        rod_i_moment += pair.weight * p_RcQ.cross(force);
       }
       /* Multiply by the volume to convert force density to force. Divide
        by 2 because the Gauss quadrature weights sum to 2. */

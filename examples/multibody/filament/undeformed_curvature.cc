@@ -56,8 +56,8 @@ class FictiousFloor : public ForceDensityField<T> {
   }
 
  private:
-  Vector3<T> DoEvaluateAt(const systems::Context<T>&,
-                          const Vector3<T>& p_WQ) const final {
+  Vector3<T> DoEvaluateAt(const systems::Context<T>&, const Vector3<T>& p_WQ,
+                          const Vector3<T>&) const final {
     const T phi = p_WQ[2] - FLAGS_diameter / 2;
     if (phi < 0.0)
       return Vector3<T>(0, 0, -1) * phi * FLAGS_rho * 1e4;

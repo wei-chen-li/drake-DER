@@ -131,6 +131,7 @@ GTEST_TEST(FemModelTest, CalcResidualWithContextDependentExternalForce) {
 
    private:
     Vector3<double> DoEvaluateAt(const systems::Context<double>& context,
+                                 const Vector3<double>&,
                                  const Vector3<double>&) const final {
       return context.get_time() * unit_vector_;
     };

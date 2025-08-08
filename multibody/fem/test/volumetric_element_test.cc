@@ -426,7 +426,8 @@ TEST_F(VolumetricElementTest, PerCurrentVolumeExternalForce) {
 
    private:
     Vector3<AD> DoEvaluateAt(const systems::Context<AD>& context,
-                             const Vector3<AD>& p_WQ) const final {
+                             const Vector3<AD>& p_WQ,
+                             const Vector3<AD>&) const final {
       return f_;
     };
 

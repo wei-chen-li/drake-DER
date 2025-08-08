@@ -506,6 +506,8 @@ class VolumetricElement
                                  EigenPtr<Vector<T, num_dofs>> result) const {
     const std::array<Vector<T, 3>, num_quadrature_points>&
         quadrature_positions = data.quadrature_positions;
+    const std::array<Vector<T, 3>, num_quadrature_points>&
+        quadrature_velocities = data.quadrature_velocities;
     const std::array<Vector<T, num_nodes>, num_quadrature_points>& S =
         isoparametric_element_.GetShapeFunctions();
     for (int q = 0; q < num_quadrature_points; ++q) {
@@ -522,7 +524,8 @@ class VolumetricElement
                 : deformation_gradient.determinant();
         scaled_force += scale *
                         force_density->EvaluateAt(plant_data.plant_context,
-                                                  quadrature_positions[q]) *
+                                                  quadrature_positions[q],
+                                                  quadrature_velocities[q]) *
                         reference_volume_[q] * change_of_volume;
       }
       for (int n = 0; n < num_nodes; ++n) {

@@ -59,7 +59,8 @@ class PointSourceForceField final
   }
 
   Vector3<double> DoEvaluateAt(const systems::Context<double>& context,
-                               const Vector3<double>& p_WQ) const final;
+                               const Vector3<double>& p_WQ,
+                               const Vector3<double>&) const final;
 
   std::unique_ptr<ForceDensityFieldBase<double>> DoClone() const final;
 

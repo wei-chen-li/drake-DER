@@ -105,7 +105,8 @@ TEST_F(DeformableBodyTest, Accessors) {
   const GravityForceField<double>* gravity_force_field =
       dynamic_cast<const GravityForceField<double>*>(gravity_force);
   ASSERT_NE(gravity_force_field, nullptr);
-  EXPECT_EQ(gravity_force_field->EvaluateAt(*plant_context_, Vector3d(1, 2, 3)),
+  EXPECT_EQ(gravity_force_field->EvaluateAt(*plant_context_, Vector3d(1, 2, 3),
+                                            Vector3d(0, 0, 0)),
             Vector3d(0, 0, -9.81) * default_body_config_.mass_density());
 
   /* Discrete state index. */

@@ -1229,9 +1229,9 @@ class DelegatedForceDensityField final : public ForceDensityField<T> {
   }
 
  private:
-  Vector3<T> DoEvaluateAt(
-      const systems::Context<T>& context, const Vector3<T>& p_WQ) const final {
-    return impl_->EvaluateAt(context, p_WQ);
+  Vector3<T> DoEvaluateAt(const systems::Context<T>& context,
+      const Vector3<T>& p_WQ, const Vector3<T>& v_WQ) const final {
+    return impl_->EvaluateAt(context, p_WQ, v_WQ);
   }
 
   std::unique_ptr<ForceDensityFieldBase<T>> DoClone() const final {
@@ -1248,7 +1248,7 @@ class PyForceDensityField : public ForceDensityFieldPublic<T> {
       : ForceDensityFieldPublic<T>(density_type) {}
 
   Vector3<T> DoEvaluateAt(const systems::Context<T>& context,
-      const Vector3<T>& p_WQ) const override {
+      const Vector3<T>& p_WQ, const Vector3<T>& v_WQ) const override {
     py::gil_scoped_acquire gil;
     py::function override = py::get_override(
         static_cast<const ForceDensityField<T>*>(this), "DoEvaluateAt");
@@ -1258,8 +1258,8 @@ class PyForceDensityField : public ForceDensityFieldPublic<T> {
           "DoEvaluateAt().");
     }
     // Call Python-side DoEvaluateAt.
-    py::object result_obj =
-        override(py::cast(context, py_rvp::reference), py::cast(p_WQ));
+    py::object result_obj = override(
+        py::cast(context, py_rvp::reference), py::cast(p_WQ), py::cast(v_WQ));
     try {
       return result_obj.cast<Vector3<T>>();
     } catch (const py::cast_error& e) {

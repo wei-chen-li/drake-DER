@@ -3561,7 +3561,8 @@ class TestPlant(unittest.TestCase):
 
         external_forces = dut.GetExternalForces(body_id)
         numpy_compare.assert_float_equal(
-            external_forces[-1].EvaluateAt(context, [0, 0, 0]), [0, 0, 1.23])
+            external_forces[-1].EvaluateAt(context, [0, 0, 0], [0, 0, 0]),
+            [0, 0, 1.23])
 
     def test_deformable_model_disable_enable(self):
         builder = DiagramBuilder_[float]()
@@ -3782,8 +3783,10 @@ class TestPlant(unittest.TestCase):
                          ForceDensityType.kPerReferenceVolume)
         self.assertFalse(dut.has_parent_system())
 
+        p_WQ = [0, 0, 0]
+        v_WQ = [0, 0, 0]
         numpy_compare.assert_float_equal(
-            dut.EvaluateAt(context, [0, 0, 0]), [0, 0, 1.23])
+            dut.EvaluateAt(context, p_WQ, v_WQ), [0, 0, 1.23])
 
         dut.Clone()
         copy.copy(dut)
@@ -3796,8 +3799,8 @@ class TestPlant(unittest.TestCase):
                 super().__init__()
                 self._scale = scale
 
-            def DoEvaluateAt(self, context, p_WQ):
-                return p_WQ * self._scale
+            def DoEvaluateAt(self, context, p_WQ, v_WQ):
+                return (p_WQ + v_WQ) * self._scale
 
             def DoClone(self):
                 return DummyField(self._scale)
@@ -3812,11 +3815,13 @@ class TestPlant(unittest.TestCase):
         self.assertFalse(dut.has_parent_system())
 
         p_WQ = [1.0, 2.0, 3.0]
-        value = [2.0, 4.0, 6.0]
-        numpy_compare.assert_float_equal(dut.EvaluateAt(context, p_WQ), value)
+        v_WQ = [2.0, 3.0, 4.0]
+        value = [6.0, 10.0, 14.0]
         numpy_compare.assert_float_equal(
-            dut.Clone().EvaluateAt(context, p_WQ), value)
+            dut.EvaluateAt(context, p_WQ, v_WQ), value)
         numpy_compare.assert_float_equal(
-            copy.copy(dut).EvaluateAt(context, p_WQ), value)
+            dut.Clone().EvaluateAt(context, p_WQ, v_WQ), value)
         numpy_compare.assert_float_equal(
-            copy.deepcopy(dut).EvaluateAt(context, p_WQ), value)
+            copy.copy(dut).EvaluateAt(context, p_WQ, v_WQ), value)
+        numpy_compare.assert_float_equal(
+            copy.deepcopy(dut).EvaluateAt(context, p_WQ, v_WQ), value)

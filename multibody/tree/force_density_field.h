@@ -132,7 +132,7 @@ class GravityForceField : public ForceDensityField<T> {
   ~GravityForceField() override;
 
  private:
-  Vector3<T> DoEvaluateAt(const systems::Context<T>&,
+  Vector3<T> DoEvaluateAt(const systems::Context<T>&, const Vector3<T>&,
                           const Vector3<T>&) const final {
     return force_density_;
   };

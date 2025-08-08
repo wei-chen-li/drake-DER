@@ -38,10 +38,11 @@ class ForceDensityFieldBase {
   virtual ~ForceDensityFieldBase() = 0;
 
   /** Evaluates the force density [N/m³] with the given `context` of the
-   owning MultibodyPlant and a position in world, `p_WQ`. */
+   owning MultibodyPlant and at position in world `p_WQ` with velocity in world
+   `v_WQ`. */
   Vector3<T> EvaluateAt(const systems::Context<T>& context,
-                        const Vector3<T>& p_WQ) const {
-    return DoEvaluateAt(context, p_WQ);
+                        const Vector3<T>& p_WQ, const Vector3<T>& v_WQ) const {
+    return DoEvaluateAt(context, p_WQ, v_WQ);
   }
 
   /** Returns an identical copy of `this` ForceDensityFieldBase. */
@@ -57,7 +58,8 @@ class ForceDensityFieldBase {
   /** Derived classes must override this function to provide a threadsafe
    implemention to the NVI EvaluateAt(). */
   virtual Vector3<T> DoEvaluateAt(const systems::Context<T>& context,
-                                  const Vector3<T>& p_WQ) const = 0;
+                                  const Vector3<T>& p_WQ,
+                                  const Vector3<T>& v_WQ) const = 0;
 
   /** Derived classes must override this function to implement the NVI
    Clone(). */

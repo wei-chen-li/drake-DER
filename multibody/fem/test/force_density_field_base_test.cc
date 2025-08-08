@@ -32,7 +32,8 @@ class ConstantForceDensityField final : public ForceDensityField<double> {
   DRAKE_DEFAULT_COPY_AND_MOVE_AND_ASSIGN(ConstantForceDensityField);
 
   Vector3<double> DoEvaluateAt(const systems::Context<double>& context,
-                               const Vector3<double>& p_WQ) const final {
+                               const Vector3<double>& p_WQ,
+                               const Vector3<double>&) const final {
     return get_input_port().Eval(context)(0) * field_(p_WQ);
   };
 
@@ -74,9 +75,11 @@ TEST_F(ForceDensityFieldTest, EvaluateAt) {
   const double scale = 2.71;
   dut_->get_input_port().FixValue(plant_context.get(), Vector1d(scale));
   const Vector3d p_WQ(1, 2, 3);
+  const Vector3d v_WQ(0, 0, 0);
   const Vector3d expected_force_density =
       scale * Vector3d(std::sin(p_WQ[0]), std::cos(p_WQ[1]), p_WQ[2]);
-  EXPECT_EQ(dut_->EvaluateAt(*plant_context, p_WQ), expected_force_density);
+  EXPECT_EQ(dut_->EvaluateAt(*plant_context, p_WQ, v_WQ),
+            expected_force_density);
 }
 
 TEST_F(ForceDensityFieldTest, Clone) {
@@ -100,8 +103,9 @@ TEST_F(ForceDensityFieldTest, Clone) {
     for (int j = 0; j < 3; ++j) {
       for (int k = 0; k < 3; ++k) {
         const Vector3d p_WQ(i, j, k);
-        EXPECT_EQ(dut_->EvaluateAt(*plant_context, p_WQ),
-                  clone->EvaluateAt(*clone_context, p_WQ));
+        const Vector3d v_WQ(0, 0, 0);
+        EXPECT_EQ(dut_->EvaluateAt(*plant_context, p_WQ, v_WQ),
+                  clone->EvaluateAt(*clone_context, p_WQ, v_WQ));
       }
     }
   }

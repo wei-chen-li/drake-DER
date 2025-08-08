@@ -367,7 +367,8 @@ TEST_F(DeformableModelTest, ExternalForces) {
 
    private:
     Vector3<double> DoEvaluateAt(const systems::Context<double>& context,
-                                 const Vector3<double>& p_WQ) const final {
+                                 const Vector3<double>& p_WQ,
+                                 const Vector3<double>&) const final {
       return get_input_port().Eval(context)(0) * field_(p_WQ);
     };
 
@@ -426,16 +427,18 @@ TEST_F(DeformableModelTest, ExternalForces) {
      above. */
     ASSERT_TRUE((g != nullptr) ^ (f != nullptr));
     const Vector3d p_WQ(1, 2, 3);
+    const Vector3d v_WQ(0, 0, 0);
     if (g != nullptr) {
       EXPECT_EQ(g->density_type(), ForceDensityType::kPerReferenceVolume);
-      EXPECT_EQ(force->EvaluateAt(*plant_context, p_WQ),
+      EXPECT_EQ(force->EvaluateAt(*plant_context, p_WQ, v_WQ),
                 gravity_vector * default_body_config_.mass_density());
     } else {
       EXPECT_EQ(f->density_type(), ForceDensityType::kPerCurrentVolume);
       const double scale = 2.71;
       constant_force_ptr->get_input_port().FixValue(plant_context.get(),
                                                     Vector1d(scale));
-      EXPECT_EQ(force->EvaluateAt(*plant_context, p_WQ), scale * 3.14 * p_WQ);
+      EXPECT_EQ(force->EvaluateAt(*plant_context, p_WQ, v_WQ),
+                scale * 3.14 * p_WQ);
     }
   }
 

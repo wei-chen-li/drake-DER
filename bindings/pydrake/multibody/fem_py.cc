@@ -96,7 +96,7 @@ void DefineForceDensityFieldBase(py::module m, T) {
         m, "ForceDensityFieldBase", param, cls_doc.doc);
     cls  // BR
         .def("EvaluateAt", &Class::EvaluateAt, py::arg("context"),
-            py::arg("p_WQ"), cls_doc.EvaluateAt.doc)
+            py::arg("p_WQ"), py::arg("v_WQ"), cls_doc.EvaluateAt.doc)
         .def("density_type", &Class::density_type, cls_doc.density_type.doc);
     DefClone(&cls);
   }
