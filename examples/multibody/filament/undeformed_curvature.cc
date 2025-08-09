@@ -11,7 +11,7 @@
 
 DEFINE_double(simulation_time, 10.0, "Desired duration of the simulation [s].");
 DEFINE_double(realtime_rate, 1.0, "Desired real time rate.");
-DEFINE_double(time_step, 1e-2,
+DEFINE_double(time_step, 3e-3,
               "Discrete time step for the system [s]. Must be positive.");
 DEFINE_double(E, 1e6, "Young's modulus of the deformable bodies [Pa].");
 DEFINE_double(rho, 1000, "Mass density of the deformable bodies [kg/m³].");
@@ -51,23 +51,59 @@ class FictiousFloor : public ForceDensityField<T> {
  public:
   DRAKE_DEFAULT_COPY_AND_MOVE_AND_ASSIGN(FictiousFloor);
 
-  FictiousFloor()
-      : ForceDensityField<T>(multibody::ForceDensityType::kPerReferenceVolume) {
+  FictiousFloor(const Vector3<T>& floor_normal, const Vector3<T>& floor_point,
+                const T& mass_density, const T& stiffness = 1e5,
+                const T& hunt_crossley_dissipation = 50,
+                const T& friction_coefficient = 0.2)
+      : ForceDensityField<T>(multibody::ForceDensityType::kPerReferenceVolume),
+        n_WF_(floor_normal.normalized()),
+        p_WF_(floor_point),
+        rho_(mass_density),
+        k_(stiffness),
+        d_(hunt_crossley_dissipation),
+        mu_(friction_coefficient) {
+    DRAKE_THROW_UNLESS(rho_ > 0);
+    DRAKE_THROW_UNLESS(k_ > 0);
+    DRAKE_THROW_UNLESS(d_ > 0);
+    DRAKE_THROW_UNLESS(mu_ > 0);
   }
 
  private:
   Vector3<T> DoEvaluateAt(const systems::Context<T>&, const Vector3<T>& p_WQ,
-                          const Vector3<T>&) const final {
-    const T phi = p_WQ[2] - FLAGS_diameter / 2;
-    if (phi < 0.0)
-      return Vector3<T>(0, 0, -1) * phi * FLAGS_rho * 1e4;
-    else
-      return Vector3<T>::Zero();
+                          const Vector3<T>& v_WQ) const final {
+    /* Signed penetration distance, negative for penetration. */
+    const T phi = (p_WQ - p_WF_).dot(n_WF_);
+    /* Penetration distance time derivative, negative for increasing
+     penetration. */
+    const T phi_dot = v_WQ.dot(n_WF_);
+    /* Normal force. */
+    const T Fn = std::max(0.0, -k_ * phi) * std::max(0.0, T(1.0) - d_ * phi_dot);
+    /* Tangential (slip) velocity vector. */
+    const Vector3<T> vt = v_WQ - phi_dot * n_WF_;
+    const T vt_norm = vt.norm();
+    /* γ scaling factor: gamma = 2 / (1 + exp(-K * vt_norm)) - 1 */
+    const T K = 10;
+    const T gamma = 2.0 / (1.0 + exp(-K * vt_norm)) - 1.0;
+    /* Unit tangential direction (safe for small vt). */
+    constexpr double epsilon = 1e-8;
+    const Vector3<T> t_hat =
+        (vt_norm >= epsilon) ? vt / vt_norm : vt / (vt_norm + epsilon);
+    /* Tangential friction force. */
+    const Vector3<T> Ft = -mu_ * gamma * Fn * t_hat;
+
+    return (Fn * n_WF_ + Ft) * rho_;
   }
 
   std::unique_ptr<ForceDensityFieldBase<T>> DoClone() const final {
     return std::make_unique<FictiousFloor<T>>(*this);
   }
+
+  Vector3<T> n_WF_;
+  Vector3<T> p_WF_;
+  T rho_;
+  T k_;
+  T d_;
+  T mu_;
 };
 
 DeformableBodyId RegisterFilament(DeformableModel<double>* deformable_model) {
@@ -104,7 +140,7 @@ DeformableBodyId RegisterFilament(DeformableModel<double>* deformable_model) {
   config.set_youngs_modulus(FLAGS_E);
   config.set_poissons_ratio(0.4999);
   config.set_mass_density(FLAGS_rho);
-  config.set_mass_damping_coefficient(10.0);
+  config.set_mass_damping_coefficient(1.0);
 
   /* Add the geometry instance to the deformable model. The filament geometry is
    further discretized based on resolution_hint. */
@@ -124,7 +160,8 @@ int do_main() {
   auto [plant, scene_graph] = AddMultibodyPlant(plant_config, &builder);
   DeformableModel<double>& deformable_model = plant.mutable_deformable_model();
   RegisterFilament(&deformable_model);
-  deformable_model.AddExternalForce(std::make_unique<FictiousFloor<double>>());
+  deformable_model.AddExternalForce(std::make_unique<FictiousFloor<double>>(
+      Vector3d(0, 0, 1), Vector3d(0, 0, FLAGS_diameter / 2), FLAGS_rho));
   plant.Finalize();
 
   /* Add a visualizer that emits LCM messages for visualization. */
