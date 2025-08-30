@@ -77,7 +77,8 @@ class FictiousFloor : public ForceDensityField<T> {
      penetration. */
     const T phi_dot = v_WQ.dot(n_WF_);
     /* Normal force. */
-    const T Fn = std::max(0.0, -k_ * phi) * std::max(0.0, T(1.0) - d_ * phi_dot);
+    const T Fn =
+        std::max(0.0, -k_ * phi) * std::max(0.0, T(1.0) - d_ * phi_dot);
     /* Tangential (slip) velocity vector. */
     const Vector3<T> vt = v_WQ - phi_dot * n_WF_;
     const T vt_norm = vt.norm();
