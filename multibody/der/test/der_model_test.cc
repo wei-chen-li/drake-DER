@@ -19,7 +19,7 @@ class DerModelTester {
   DerModelTester() = delete;
 
   template <typename T>
-  static const internal::DerStructuralProperty<T>& get_der_structural_property(
+  static const DerStructuralProperty<T>& get_der_structural_property(
       const DerModel<T>& der_model) {
     return der_model.der_structural_property_;
   }
@@ -190,25 +190,22 @@ class DerModelBuilderTest
   }
 
   void CheckCrossSection() {
-    const internal::DerStructuralProperty<double>& der_structural_property =
+    const DerStructuralProperty<double>& der_structural_property =
         DerModelTester::get_der_structural_property(*model_);
 
     const auto [E, G, rho] = std::make_tuple(3e9, 0.8e9, 910);
-    std::optional<internal::DerStructuralProperty<double>> expected;
+    std::optional<DerStructuralProperty<double>> expected;
 
     CrossSectionTests opt = std::get<2>(GetParam());
     if (opt == kCircular) {
-      expected =
-          internal::DerStructuralProperty<double>::FromCircularCrossSection(
-              1e-3, E, G, rho);
+      expected = DerStructuralProperty<double>::FromCircularCrossSection(
+          1e-3, E, G, rho);
     } else if (opt == kRectangular) {
-      expected =
-          internal::DerStructuralProperty<double>::FromRectangularCrossSection(
-              1.38e-3, 6e-3, E, G, rho);
+      expected = DerStructuralProperty<double>::FromRectangularCrossSection(
+          1.38e-3, 6e-3, E, G, rho);
     } else if (opt == kElliptical) {
-      expected =
-          internal::DerStructuralProperty<double>::FromEllipticalCrossSection(
-              2.0e-3, 1.5e-3, E, G, rho);
+      expected = DerStructuralProperty<double>::FromEllipticalCrossSection(
+          2.0e-3, 1.5e-3, E, G, rho);
     }
     EXPECT_EQ(der_structural_property.EA(), expected->EA());
     EXPECT_EQ(der_structural_property.EI1(), expected->EI1());
@@ -359,7 +356,7 @@ TEST_P(DerModelTest, ComputeResidual) {
   internal::ComputeElasticEnergyHessian(prop, undeformed, *state, &d2Edq2,
                                         Parallelism::None());
 
-  MatrixXd M = ComputeMassMatrix(prop, undeformed).toDenseMatrix();
+  MatrixXd M = internal::ComputeMassMatrix(prop, undeformed).toDenseMatrix();
   MatrixXd K = d2Edq2.MakeDenseMatrix().topLeftCorner(num_dofs, num_dofs);
   VectorXd qdot = state->get_velocity();
   VectorXd qddot = state->get_acceleration();
@@ -406,7 +403,7 @@ TEST_P(DerModelTest, ComputeTangentMatrix) {
   internal::ComputeElasticEnergyHessian(prop, undeformed, *state, &d2Edq2,
                                         Parallelism::None());
 
-  MatrixXd M = ComputeMassMatrix(prop, undeformed).toDenseMatrix();
+  MatrixXd M = internal::ComputeMassMatrix(prop, undeformed).toDenseMatrix();
   MatrixXd K = d2Edq2.MakeDenseMatrix().topLeftCorner(num_dofs, num_dofs);
   double alpha = damping.mass_coeff_alpha();
   double beta = damping.stiffness_coeff_beta();

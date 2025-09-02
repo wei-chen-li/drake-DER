@@ -299,10 +299,16 @@ class DerModel {
   std::unique_ptr<DerModel<U>> ToScalarType() const;
 
   /** Returns the structural property of this model. */
-  const internal::DerStructuralProperty<T>& structural_property() const {
+  const DerStructuralProperty<T>& structural_property() const {
     return der_structural_property_;
   }
 
+  /** Returns the mutable structural property of this model. */
+  DerStructuralProperty<T>& mutable_structural_property() {
+    return der_structural_property_;
+  }
+
+  /** Returns the mutable undeformed state of this model. */
   DerUndeformedState<T>& mutable_undeformed_state() {
     return der_undeformed_state_;
   }
@@ -329,7 +335,7 @@ class DerModel {
 
   /* Private constructor. */
   DerModel(std::unique_ptr<const internal::DerStateSystem<T>> der_state_system,
-           internal::DerStructuralProperty<T> der_structural_property,
+           DerStructuralProperty<T> der_structural_property,
            DerUndeformedState<T> der_undeformed_state,
            internal::DampingModel<T> damping_model,
            internal::DirichletBoundaryCondition<T> boundary_condition);
@@ -338,7 +344,7 @@ class DerModel {
   void ValidateScratch(const Scratch* scratch) const;
 
   const std::unique_ptr<const internal::DerStateSystem<T>> der_state_system_;
-  const internal::DerStructuralProperty<T> der_structural_property_;
+  DerStructuralProperty<T> der_structural_property_;
   DerUndeformedState<T> der_undeformed_state_;
   const internal::DampingModel<T> damping_model_;
   internal::DirichletBoundaryCondition<T> boundary_condition_;

@@ -142,8 +142,6 @@ void DerModel<T>::Builder::SetDampingCoefficients(
 
 template <typename T>
 std::unique_ptr<DerModel<T>> DerModel<T>::Builder::Build() {
-  using internal::DerStructuralProperty;
-
   if (is_built_) throw std::logic_error("The DER model is already build.");
   if (!is_configuration_finalized_)
     throw std::logic_error("The rod configuration is not finalized yet.");
@@ -187,7 +185,7 @@ std::unique_ptr<DerModel<T>> DerModel<T>::Builder::Build() {
 template <typename T>
 DerModel<T>::DerModel(
     std::unique_ptr<const internal::DerStateSystem<T>> der_state_system,
-    internal::DerStructuralProperty<T> der_structural_property,
+    DerStructuralProperty<T> der_structural_property,
     DerUndeformedState<T> der_undeformed_state,
     internal::DampingModel<T> damping_model,
     internal::DirichletBoundaryCondition<T> boundary_condition)

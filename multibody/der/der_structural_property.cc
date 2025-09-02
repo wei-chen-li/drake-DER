@@ -7,7 +7,6 @@
 namespace drake {
 namespace multibody {
 namespace der {
-namespace internal {
 
 template <typename T>
 DerStructuralProperty<T> DerStructuralProperty<T>::FromRectangularCrossSection(
@@ -76,10 +75,9 @@ DerStructuralProperty<Expression>::ToScalarType<double>() const;
 template DerStructuralProperty<AutoDiffXd>
 DerStructuralProperty<Expression>::ToScalarType<AutoDiffXd>() const;
 
-}  // namespace internal
 }  // namespace der
 }  // namespace multibody
 }  // namespace drake
 
 DRAKE_DEFINE_CLASS_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
-    class ::drake::multibody::der::internal::DerStructuralProperty);
+    class ::drake::multibody::der::DerStructuralProperty);

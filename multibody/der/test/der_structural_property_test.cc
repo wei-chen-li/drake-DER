@@ -7,7 +7,6 @@
 namespace drake {
 namespace multibody {
 namespace der {
-namespace internal {
 namespace {
 
 using std::pow;
@@ -88,6 +87,7 @@ TEST_F(DerStructuralPropertyTest, ScalarConversion) {
 
   const auto prop2 = prop1.ToScalarType<double>();
 
+  EXPECT_EQ(prop1.A().value(), prop2.A());
   EXPECT_EQ(prop1.EA().value(), prop2.EA());
   EXPECT_EQ(prop1.EI1().value(), prop2.EI1());
   EXPECT_EQ(prop1.EI2().value(), prop2.EI2());
@@ -97,7 +97,6 @@ TEST_F(DerStructuralPropertyTest, ScalarConversion) {
 }
 
 }  // namespace
-}  // namespace internal
 }  // namespace der
 }  // namespace multibody
 }  // namespace drake

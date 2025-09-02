@@ -19,6 +19,36 @@ void DoScalarDependentDefinitions(py::module m, T) {
   constexpr auto& doc = pydrake_doc.drake.multibody.der;
 
   {
+    using Class = DerStructuralProperty<T>;
+    constexpr auto& cls_doc = doc.DerStructuralProperty;
+    auto cls = DefineTemplateClassWithDefault<Class>(
+        m, "DerStructuralProperty", param, cls_doc.doc);
+    cls  // BR
+        .def_static("FromRectangularCrossSection",
+            &Class::FromRectangularCrossSection, py::arg("width"),
+            py::arg("height"), py::arg("youngs_modulus"),
+            py::arg("shear_modulus"), py::arg("mass_density"),
+            cls_doc.FromRectangularCrossSection.doc)
+        .def_static("FromEllipticalCrossSection",
+            &Class::FromEllipticalCrossSection, py::arg("a"), py::arg("b"),
+            py::arg("youngs_modulus"), py::arg("shear_modulus"),
+            py::arg("mass_density"), cls_doc.FromEllipticalCrossSection.doc)
+        .def_static("FromCircularCrossSection",
+            &Class::FromCircularCrossSection, py::arg("r"),
+            py::arg("youngs_modulus"), py::arg("shear_modulus"),
+            py::arg("mass_density"), cls_doc.FromCircularCrossSection.doc)
+        .def("A", &Class::A, cls_doc.A.doc)
+        .def("EA", &Class::EA, cls_doc.EA.doc)
+        .def("EI1", &Class::EI1, cls_doc.EI1.doc)
+        .def("EI2", &Class::EI2, cls_doc.EI2.doc)
+        .def("GJ", &Class::GJ, cls_doc.GJ.doc)
+        .def("rhoA", &Class::rhoA, cls_doc.rhoA.doc)
+        .def("rhoJ", &Class::rhoJ, cls_doc.rhoJ.doc)
+        .def("set_A", &Class::set_A, py::arg("A"), cls_doc.set_A.doc);
+    DefCopyAndDeepCopy(&cls);
+  }
+
+  {
     using Class = DerUndeformedState<T>;
     constexpr auto& cls_doc = doc.DerUndeformedState;
     auto cls = DefineTemplateClassWithDefault<Class>(
@@ -67,6 +97,10 @@ void DoScalarDependentDefinitions(py::module m, T) {
         .def("num_nodes", &Class::num_nodes, cls_doc.num_nodes.doc)
         .def("num_edges", &Class::num_edges, cls_doc.num_edges.doc)
         .def("num_dofs", &Class::num_dofs, cls_doc.num_dofs.doc)
+        .def("structural_property", &Class::structural_property,
+            cls_doc.structural_property.doc)
+        .def("mutable_structural_property", &Class::mutable_structural_property,
+            py_rvp::reference_internal, cls_doc.mutable_structural_property.doc)
         .def("mutable_undeformed_state", &Class::mutable_undeformed_state,
             py_rvp::reference_internal, cls_doc.mutable_undeformed_state.doc);
     DefClone(&cls);
@@ -79,7 +113,7 @@ PYBIND11_MODULE(der, m) {
   m.doc() = "Bindings for multibody der.";
 
   type_visit([m](auto dummy) { DoScalarDependentDefinitions(m, dummy); },
-      NonSymbolicScalarPack{});
+      CommonScalarPack{});
 }
 
 }  // namespace pydrake

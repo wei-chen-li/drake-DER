@@ -6,9 +6,8 @@
 namespace drake {
 namespace multibody {
 namespace der {
-namespace internal {
 
-/*
+/**
  @p DerStructuralProperty holds properties regarding the Young's modulus, shear
  modulus, mass density, and cross section of a discrete elastic rod.
 
@@ -19,7 +18,7 @@ class DerStructuralProperty {
  public:
   DRAKE_DEFAULT_COPY_AND_MOVE_AND_ASSIGN(DerStructuralProperty);
 
-  /* Create a @p DerStructuralProperty corresponding to a rectangular cross
+  /** Create a @p DerStructuralProperty corresponding to a rectangular cross
    section shown in the following figure.
    @verbatim
                   m₂
@@ -37,7 +36,7 @@ class DerStructuralProperty {
       const T& width, const T& height, const T& youngs_modulus,
       const T& shear_modulus, const T& mass_density);
 
-  /* Create a @p DerStructuralProperty corresponding to an elliptical cross
+  /** Create a @p DerStructuralProperty corresponding to an elliptical cross
    section shown in the following figure.
    @verbatim
                   m₂
@@ -54,26 +53,31 @@ class DerStructuralProperty {
       const T& a, const T& b, const T& youngs_modulus, const T& shear_modulus,
       const T& mass_density);
 
-  /* Create a @p DerStructuralProperty corresponding to a circular cross
+  /** Create a @p DerStructuralProperty corresponding to a circular cross
    section with radius @p r. */
   static DerStructuralProperty<T> FromCircularCrossSection(
       const T& r, const T& youngs_modulus, const T& shear_modulus,
       const T& mass_density);
 
-  /* ∫dA. */
+  /** ∫dA. */
   const T& A() const { return A_; }
-  /* Young's modulus times ∫dA. */
+  /** Young's modulus times ∫dA. */
   T EA() const { return E_ * A_; }
-  /* Young's modulus times ∫(p⋅m₁)²dA. */
+  /** Young's modulus times ∫(p⋅m₁)²dA. */
   T EI1() const { return E_ * I1_; }
-  /* Young's modulus times ∫(p⋅m₂)²dA. */
+  /** Young's modulus times ∫(p⋅m₂)²dA. */
   T EI2() const { return E_ * I2_; }
-  /* Shear modulus times ∫((p⋅m₁)²+(p⋅m₂)²)dA. */
+  /** Shear modulus times ∫((p⋅m₁)²+(p⋅m₂)²)dA. */
   T GJ() const { return G_ * J_; }
-  /* Mass density times ∫dA. */
+  /** Mass density times ∫dA. */
   T rhoA() const { return rho_ * A_; }
-  /* Mass density times ∫√((p⋅m₁)²+(p⋅m₂)²)dA. */
+  /** Mass density times ∫√((p⋅m₁)²+(p⋅m₂)²)dA. */
   T rhoJ() const { return rho_ * J_; }
+
+  void set_A(const T& A) {
+    DRAKE_THROW_UNLESS(A > 0);
+    A_ = A;
+  }
 
   template <typename U>
   DerStructuralProperty<U> ToScalarType() const;
@@ -94,10 +98,9 @@ class DerStructuralProperty {
   T J_{};
 };
 
-}  // namespace internal
 }  // namespace der
 }  // namespace multibody
 }  // namespace drake
 
 DRAKE_DECLARE_CLASS_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
-    class ::drake::multibody::der::internal::DerStructuralProperty);
+    class ::drake::multibody::der::DerStructuralProperty);
