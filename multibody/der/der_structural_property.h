@@ -61,6 +61,10 @@ class DerStructuralProperty {
 
   /** ∫dA. */
   const T& A() const { return A_; }
+  /** ∫(p⋅m₁)²dA. */
+  const T& I1() const { return I1_; }
+  /** ∫(p⋅m₂)²dA. */
+  const T& I2() const { return I2_; }
   /** Young's modulus times ∫dA. */
   T EA() const { return E_ * A_; }
   /** Young's modulus times ∫(p⋅m₁)²dA. */
@@ -74,10 +78,9 @@ class DerStructuralProperty {
   /** Mass density times ∫√((p⋅m₁)²+(p⋅m₂)²)dA. */
   T rhoJ() const { return rho_ * J_; }
 
-  void set_A(const T& A) {
-    DRAKE_THROW_UNLESS(A > 0);
-    A_ = A;
-  }
+  void set_A(const T& A);
+  void set_I1(const T& I1);
+  void set_I2(const T& I2);
 
   template <typename U>
   DerStructuralProperty<U> ToScalarType() const;

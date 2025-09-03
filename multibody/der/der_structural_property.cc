@@ -52,6 +52,26 @@ DerStructuralProperty<T>::DerStructuralProperty(const T& E, const T& G,
 }
 
 template <typename T>
+void DerStructuralProperty<T>::set_A(const T& A) {
+  DRAKE_THROW_UNLESS(A > 0);
+  A_ = A;
+}
+
+template <typename T>
+void DerStructuralProperty<T>::set_I1(const T& I1) {
+  DRAKE_THROW_UNLESS(I1 > 0);
+  I1_ = I1;
+  J_ = I1_ + I2_;
+}
+
+template <typename T>
+void DerStructuralProperty<T>::set_I2(const T& I2) {
+  DRAKE_THROW_UNLESS(I2 > 0);
+  I2_ = I2;
+  J_ = I1_ + I2_;
+}
+
+template <typename T>
 template <typename U>
 DerStructuralProperty<U> DerStructuralProperty<T>::ToScalarType() const {
   static_assert(!std::is_same_v<T, U>);

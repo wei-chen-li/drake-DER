@@ -38,13 +38,17 @@ void DoScalarDependentDefinitions(py::module m, T) {
             py::arg("youngs_modulus"), py::arg("shear_modulus"),
             py::arg("mass_density"), cls_doc.FromCircularCrossSection.doc)
         .def("A", &Class::A, cls_doc.A.doc)
+        .def("I1", &Class::I1, cls_doc.I1.doc)
+        .def("I2", &Class::I2, cls_doc.I2.doc)
         .def("EA", &Class::EA, cls_doc.EA.doc)
         .def("EI1", &Class::EI1, cls_doc.EI1.doc)
         .def("EI2", &Class::EI2, cls_doc.EI2.doc)
         .def("GJ", &Class::GJ, cls_doc.GJ.doc)
         .def("rhoA", &Class::rhoA, cls_doc.rhoA.doc)
         .def("rhoJ", &Class::rhoJ, cls_doc.rhoJ.doc)
-        .def("set_A", &Class::set_A, py::arg("A"), cls_doc.set_A.doc);
+        .def("set_A", &Class::set_A, py::arg("A"), cls_doc.set_A.doc)
+        .def("set_I1", &Class::set_I1, py::arg("I1"), cls_doc.set_I1.doc)
+        .def("set_I2", &Class::set_I2, py::arg("I2"), cls_doc.set_I2.doc);
     DefCopyAndDeepCopy(&cls);
   }
 

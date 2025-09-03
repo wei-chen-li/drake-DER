@@ -22,6 +22,8 @@ class TestMultibodyDer(unittest.TestCase):
         prop = DerStructuralProperty_[T].FromRectangularCrossSection(
             width=w, height=h, youngs_modulus=E, shear_modulus=G, mass_density=rho)
         numpy_compare.assert_float_allclose(prop.A(), A)
+        numpy_compare.assert_float_allclose(prop.I1(), I1)
+        numpy_compare.assert_float_allclose(prop.I2(), I2)
         numpy_compare.assert_float_allclose(prop.EA(), E * A)
         numpy_compare.assert_float_allclose(prop.EI1(), E * I1)
         numpy_compare.assert_float_allclose(prop.EI2(), E * I2)
@@ -32,6 +34,16 @@ class TestMultibodyDer(unittest.TestCase):
         A *= 4
         prop.set_A(A)
         numpy_compare.assert_float_allclose(prop.A(), A)
+
+        I1 *= 0.2
+        prop.set_I1(I1)
+        numpy_compare.assert_float_allclose(prop.I1(), I1)
+        numpy_compare.assert_float_allclose(prop.GJ(), G * (I1 + I2))
+
+        I2 *= 0.2
+        prop.set_I2(I2)
+        numpy_compare.assert_float_allclose(prop.I2(), I2)
+        numpy_compare.assert_float_allclose(prop.GJ(), G * (I1 + I2))
 
     @numpy_compare.check_all_types
     def test_der_undeformed_state(self, T):
