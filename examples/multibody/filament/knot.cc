@@ -1,3 +1,5 @@
+#include <chrono>
+#include <iomanip>
 #include <iostream>
 
 #include <gflags/gflags.h>
@@ -14,8 +16,8 @@
 #include "drake/systems/framework/diagram_builder.h"
 
 DEFINE_double(time_step, 1e-4, "Discrete time step for the system [s].");
-DEFINE_double(E, 2.4e8, "Young's modulus of the filament [Pa].");
-DEFINE_double(G, 1.0e8, "Shear modulus of the filament [Pa].");
+DEFINE_double(E, 0.18e8, "Young's modulus of the filament [Pa].");
+DEFINE_double(G, 0.06e8 + 1, "Shear modulus of the filament [Pa].");
 DEFINE_double(rho, 1e3, "Mass density of the filament [kg/m³].");
 DEFINE_double(diameter, 0.003, "Diameter of the filament [m].");
 DEFINE_double(mu, 0.0, "Friction coefficient of the filament [unitless].");
@@ -110,7 +112,10 @@ int do_main() {
   /* Add a minimal proximity property for collision detection. */
   geometry::ProximityProperties proximity_props;
   const CoulombFriction<double> surface_friction(FLAGS_mu, FLAGS_mu);
-  AddContactMaterial({}, {}, surface_friction, &proximity_props);
+  const double hunt_crossley_dissipation = 0.01;
+  const double point_stiffness = 1e5;
+  AddContactMaterial(hunt_crossley_dissipation, point_stiffness,
+                     surface_friction, &proximity_props);
   geometry_instance->set_proximity_properties(proximity_props);
 
   /* Set the material properties. Notice G = E / 2(1+𝜈). */
@@ -193,10 +198,21 @@ int do_main() {
   Simulator<double> simulator(*diagram);
   simulator.Initialize();
 
+  const auto start{std::chrono::steady_clock::now()};
+  std::cout << std::fixed << std::setprecision(4);
+  simulator.set_monitor([&start](const Context<double>& context) {
+    const auto now{std::chrono::steady_clock::now()};
+    std::cout << "Simulated: " << context.get_time() << "    Wall clock: "
+              << std::chrono::duration<double>(now - start).count()
+              << std::endl;
+    return systems::EventStatus::Succeeded();
+  });
+
   meshcat->StartRecording(500);
   try {
     simulator.AdvanceTo(FLAGS_pull_distance / FLAGS_pull_speed);
-  } catch (const std::exception&) {
+  } catch (const std::exception& e) {
+    std::cerr << "Error: " << e.what() << std::endl;
   }
   meshcat->StopRecording();
   meshcat->PublishRecording();
