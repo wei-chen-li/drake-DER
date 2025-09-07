@@ -415,6 +415,23 @@ void DeformableBody<T>::Enable(systems::Context<T>* context) const {
 }
 
 template <typename T>
+T DeformableBody<T>::CalcElasticEnergy(
+    const systems::Context<T>& context) const {
+  if (fem_model_) {
+    throw std::runtime_error(
+        "FEM model does not support elastic energy calculation yet.");
+  } else if (der_model_) {
+    const der::internal::DerState<T>& der_state =
+        this->GetParentTreeSystem()
+            .get_cache_entry(der_state_cache_index_)
+            .template Eval<der::internal::DerState<T>>(context);
+    return der_model_->ComputeElasticEnergy(der_state);
+  } else {
+    DRAKE_UNREACHABLE();
+  }
+}
+
+template <typename T>
 Vector3<T> DeformableBody<T>::CalcCenterOfMassPositionInWorld(
     const systems::Context<T>& context) const {
   if (fem_model_) {

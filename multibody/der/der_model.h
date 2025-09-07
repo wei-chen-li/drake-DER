@@ -270,6 +270,10 @@ class DerModel {
    @pre `state` is allocated using CreateDerState() of this DerModel. */
   void ApplyBoundaryCondition(internal::DerState<T>* state) const;
 
+  /** Computes the elastic energy of the DER.
+   @pre `state` is allocated using CreateDerState() of this DerModel. */
+  T ComputeElasticEnergy(const internal::DerState<T>& state) const;
+
   /** Computes the position of the center of mass.
    @pre `state` is allocated using CreateDerState() of this DerModel. */
   Eigen::Vector3<T> ComputeCenterOfMassPosition(

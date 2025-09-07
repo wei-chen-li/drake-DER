@@ -415,6 +415,13 @@ Eigen::RowVectorX<T> NodeRelativeMass(const DerUndeformedState<T>& undeformed) {
 }
 
 template <typename T>
+T DerModel<T>::ComputeElasticEnergy(const internal::DerState<T>& state) const {
+  this->ValidateDerState(state);
+  return internal::ComputeElasticEnergy(der_structural_property_,
+                                        der_undeformed_state_, state);
+}
+
+template <typename T>
 Eigen::Vector3<T> DerModel<T>::ComputeCenterOfMassPosition(
     const internal::DerState<T>& state) const {
   this->ValidateDerState(state);

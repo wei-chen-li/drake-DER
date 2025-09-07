@@ -348,6 +348,14 @@ class DeformableBody final : public MultibodyElement<T> {
    body is registered if set_default_pose() has not been called. */
   const math::RigidTransform<double>& get_default_pose() const { return X_WD_; }
 
+  /** Calculates the body's internal elsatic energy.
+   @param[in] context The context associated with the MultibodyPlant that owns
+                      this body.
+   @retval E the body's internal elsatic energy.
+   @throws std::exception if `context` does not belong to the MultibodyPlant
+   that owns this body. */
+  T CalcElasticEnergy(const systems::Context<T>& context) const;
+
   /** Calculates the body's center of mass position in world frame W.
    @param[in] context The context associated with the MultibodyPlant that owns
                       this body.

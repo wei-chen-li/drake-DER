@@ -1408,6 +1408,8 @@ void DefineDeformableBody(py::module m) {
           cls_doc.set_default_pose.doc)
       .def("get_default_pose", &Class::get_default_pose,
           cls_doc.get_default_pose.doc)
+      .def("CalcElasticEnergy", &Class::CalcElasticEnergy, py::arg("context"),
+          cls_doc.CalcElasticEnergy.doc)
       .def("CalcCenterOfMassPositionInWorld",
           &Class::CalcCenterOfMassPositionInWorld, py::arg("context"),
           cls_doc.CalcCenterOfMassPositionInWorld.doc)
