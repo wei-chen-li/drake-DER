@@ -301,13 +301,15 @@ void LinearBushingRollPitchYaw<T>::ThrowPitchAngleViolatesGimbalLockTolerance(
 
 template <typename T>
 T LinearBushingRollPitchYaw<T>::CalcPotentialEnergy(
-    const systems::Context<T>&,
+    const systems::Context<T>& context,
     const internal::PositionKinematicsCache<T>& /* pc */) const {
-  // TODO(Mitiguy) Per issues #12982 and #12752, implement this method.
-  //  Currently this method has not been implemented and throws an exception.
-  throw std::runtime_error(
-      "Error: LinearBushingRollPitchYaw::CalcPotentialEnergy() "
-      "has not been implemented.  Related: Issues #12982 and #12752.");
+  const Vector3<T> xyz = Calcp_AoCo_B(context);  // [x y z]ʙ
+  const T E1 = 0.5 * xyz.transpose() *
+               GetForceStiffnessConstants(context).asDiagonal() * xyz;
+  const Vector3<T> rpy = CalcBushingRollPitchYawAngles(context).vector();
+  const T E2 = 0.5 * rpy.transpose() *
+               GetTorqueStiffnessConstants(context).asDiagonal() * rpy;
+  return E1 + E2;
 }
 
 template <typename T>
