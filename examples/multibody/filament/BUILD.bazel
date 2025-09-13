@@ -138,6 +138,16 @@ drake_cc_binary(
 )
 
 drake_cc_binary(
+    name = "filament_hydroelastic_contact2",
+    srcs = ["filament_hydroelastic_contact2.cc"],
+    deps = [
+        "//geometry",
+        "//geometry/proximity",
+        "@gflags",
+    ],
+)
+
+drake_cc_binary(
     name = "flexible_shaft",
     srcs = ["flexible_shaft.cc"],
     add_test_rule = 1,
