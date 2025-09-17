@@ -128,7 +128,6 @@ class BvhUpdater {
                        const std::vector<Vector3<double>>& vertices) const {
     /* Intentionally uninitialized. */
     Eigen::Vector3d lower, upper;
-    constexpr int kElementVertexCount = MeshType::kVertexPerElement;
     constexpr double kInf = std::numeric_limits<double>::infinity();
     if (node->is_leaf()) {
       // TODO(SeanCurtis-TRI): This is the limiting factor on supporting Obb.
@@ -139,8 +138,9 @@ class BvhUpdater {
       const int num_elements = node->num_element_indices();
       for (int e = 0; e < num_elements; ++e) {
         const auto& element = mesh_.element(node->element_index(e));
-        for (int i = 0; i < kElementVertexCount; ++i) {
-          const Eigen::Vector3d& p_MV = vertices[element.vertex(i)];
+        for (int i = 0; i < MeshType::kVertexPerElement; ++i) {
+          const Eigen::Vector3d& p_MV =
+              convert_to_double(vertices[element.vertex(i)]);
           lower = lower.cwiseMin(p_MV);
           upper = upper.cwiseMax(p_MV);
         }

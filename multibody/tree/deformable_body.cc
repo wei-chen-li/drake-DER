@@ -1,5 +1,7 @@
 #include "drake/multibody/tree/deformable_body.h"
 
+#include <utility>
+
 #include "drake/common/overloaded.h"
 #include "drake/geometry/scene_graph.h"
 #include "drake/math/axis_angle.h"

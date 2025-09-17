@@ -1,5 +1,9 @@
 #include <iostream>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <gflags/gflags.h>
 
