@@ -1,5 +1,8 @@
 #include "drake/multibody/der/der_state_system.h"
 
+#include <limits>
+#include <utility>
+
 #include <fmt/format.h>
 
 #include "drake/math/axis_angle.h"
@@ -141,7 +144,7 @@ DerStateSystem<T>::DerStateSystem(
       this->DeclareAbstractParameter(Value(false))};
 
   serial_number_index_ = systems::AbstractParameterIndex{
-      this->DeclareAbstractParameter(Value(int64_t(0)))};
+      this->DeclareAbstractParameter(Value(static_cast<int64_t>(0)))};
 
   edge_vector_index_ =
       this->DeclareCacheEntry("edge vector", Zero<T, 3>(num_edges()),

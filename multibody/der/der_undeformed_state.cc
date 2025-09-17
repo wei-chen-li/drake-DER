@@ -1,6 +1,7 @@
 #include "drake/multibody/der/der_undeformed_state.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "drake/solvers/mathematical_program.h"
 #include "drake/solvers/solve.h"

@@ -20,7 +20,8 @@ class TestMultibodyDer(unittest.TestCase):
         rho = 910
 
         prop = DerStructuralProperty_[T].FromRectangularCrossSection(
-            width=w, height=h, youngs_modulus=E, shear_modulus=G, mass_density=rho)
+            width=w, height=h,
+            youngs_modulus=E, shear_modulus=G, mass_density=rho)
         numpy_compare.assert_float_allclose(prop.A(), A)
         numpy_compare.assert_float_allclose(prop.I1(), I1)
         numpy_compare.assert_float_allclose(prop.I2(), I2)

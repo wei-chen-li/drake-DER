@@ -1,5 +1,7 @@
 #include "drake/geometry/meshcat_animation.h"
 
+#include <utility>
+
 namespace drake {
 namespace geometry {
 

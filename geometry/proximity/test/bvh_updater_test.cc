@@ -1,6 +1,7 @@
 #include "drake/geometry/proximity/bvh_updater.h"
 
 #include <limits>
+#include <set>
 #include <utility>
 #include <vector>
 

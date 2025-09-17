@@ -1,5 +1,9 @@
 #include "drake/multibody/der/velocity_newmark_scheme.h"
 
+#include <limits>
+#include <memory>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include "drake/common/test_utilities/eigen_matrix_compare.h"

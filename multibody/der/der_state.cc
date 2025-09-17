@@ -1,5 +1,7 @@
 #include "drake/multibody/der/der_state.h"
 
+#include <utility>
+
 namespace drake {
 namespace multibody {
 namespace der {

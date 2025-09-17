@@ -1,5 +1,8 @@
 #include "drake/multibody/der/constraint_participation.h"
 
+#include <utility>
+#include <vector>
+
 namespace drake {
 namespace multibody {
 namespace der {

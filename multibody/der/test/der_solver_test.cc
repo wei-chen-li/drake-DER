@@ -1,5 +1,8 @@
 #include "drake/multibody/der/der_solver.h"
 
+#include <memory>
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include "drake/common/test_utilities/eigen_matrix_compare.h"

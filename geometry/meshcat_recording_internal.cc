@@ -1,5 +1,6 @@
 #include "drake/geometry/meshcat_recording_internal.h"
 
+#include <utility>
 #include <vector>
 
 namespace drake {

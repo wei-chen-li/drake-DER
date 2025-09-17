@@ -1,5 +1,9 @@
 #include "drake/geometry/query_results/filament_contact.h"
 
+#include <memory>
+#include <unordered_map>
+#include <vector>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 

@@ -1,6 +1,8 @@
 #include "drake/multibody/der/energy_hessian_matrix.h"
 
 #include <algorithm>
+#include <utility>
+#include <vector>
 
 #include "drake/multibody/der/constraint_participation.h"
 

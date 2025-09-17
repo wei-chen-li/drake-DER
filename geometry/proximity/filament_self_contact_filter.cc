@@ -1,6 +1,7 @@
 #include "drake/geometry/proximity/filament_self_contact_filter.h"
 
 #include <limits>
+#include <utility>
 
 #include "drake/common/drake_throw.h"
 

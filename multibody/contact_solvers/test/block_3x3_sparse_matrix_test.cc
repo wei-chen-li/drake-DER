@@ -1,5 +1,6 @@
 #include "drake/multibody/contact_solvers/block_3x3_sparse_matrix.h"
 
+#include <limits>
 #include <vector>
 
 #include <gtest/gtest.h>

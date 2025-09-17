@@ -1,5 +1,7 @@
 #include "drake/math/frame_transport.h"
 
+#include <utility>
+
 #include <gtest/gtest.h>
 
 #include "drake/common/test_utilities/eigen_matrix_compare.h"

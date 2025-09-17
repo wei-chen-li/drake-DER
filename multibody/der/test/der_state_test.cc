@@ -1,6 +1,7 @@
 #include "drake/multibody/der/der_state.h"
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include <gtest/gtest.h>

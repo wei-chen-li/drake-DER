@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <memory>
+#include <utility>
 
 #include <gflags/gflags.h>
 

@@ -1,6 +1,7 @@
 #include "drake/multibody/der/external_force_field.h"
 
 #include <array>
+#include <utility>
 
 namespace drake {
 namespace multibody {

@@ -2,6 +2,8 @@
 
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #include "drake/common/find_resource.h"
 #include "drake/geometry/shape_specification.h"

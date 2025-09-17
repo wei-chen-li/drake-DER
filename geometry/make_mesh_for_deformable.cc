@@ -1,5 +1,8 @@
 #include "drake/geometry/make_mesh_for_deformable.h"
 
+#include <utility>
+#include <vector>
+
 #include "drake/common/drake_assert.h"
 #include "drake/common/overloaded.h"
 #include "drake/geometry/proximity/make_mesh_from_vtk.h"

@@ -1,5 +1,7 @@
 #include "drake/multibody/der/der_undeformed_state.h"
 
+#include <vector>
+
 #include <gtest/gtest.h>
 
 #include "drake/common/autodiff.h"

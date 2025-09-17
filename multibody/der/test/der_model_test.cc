@@ -1,6 +1,8 @@
 #include "drake/multibody/der/der_model.h"
 
+#include <memory>
 #include <set>
+#include <tuple>
 
 #include <gtest/gtest.h>
 

@@ -1,6 +1,7 @@
 #include "drake/multibody/der/constraint_participation.h"
 
 #include <algorithm>
+#include <unordered_set>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

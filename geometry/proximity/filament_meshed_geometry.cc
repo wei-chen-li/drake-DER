@@ -1,6 +1,9 @@
 #include "drake/geometry/proximity/filament_meshed_geometry.h"
 
+#include <algorithm>
+#include <string>
 #include <tuple>
+#include <utility>
 
 #include "drake/common/overloaded.h"
 #include "drake/geometry/proximity/bvh_updater.h"

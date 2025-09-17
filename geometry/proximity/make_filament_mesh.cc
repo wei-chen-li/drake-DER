@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "drake/common/overloaded.h"

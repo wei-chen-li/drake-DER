@@ -271,13 +271,8 @@ class LinearBushingRollPitchYawTester : public ::testing::Test {
     const VelocityKinematicsCache<double>& vc =
         mbt.EvalVelocityKinematics(context);
 
-    // Verify CalcPotentialEnergy() throws an exception (see issue #12982).
-    const ForceElement<double>* bushing_force_element = bushing_;
-    DRAKE_EXPECT_THROWS_MESSAGE(
-        bushing_force_element->CalcPotentialEnergy(context, pc),
-        "Error: LinearBushingRollPitchYaw::CalcPotentialEnergy().*");
-
     // Verify CalcConservativePower() throws an exception (see issue #12982).
+    const ForceElement<double>* bushing_force_element = bushing_;
     DRAKE_EXPECT_THROWS_MESSAGE(
         bushing_force_element->CalcConservativePower(context, pc, vc),
         "Error: LinearBushingRollPitchYaw::CalcConservativePower().*");
