@@ -9,25 +9,6 @@ load(
 
 package(default_visibility = ["//visibility:private"])
 
-filegroup(
-    name = "filament_configurations",
-    srcs = glob(["filament_configurations/**"]),
-    visibility = ["//:__pkg__"],
-)
-
-drake_cc_library(
-    name = "filament_common",
-    srcs = ["filament_common.cc"],
-    hdrs = ["filament_common.h"],
-    data = [
-        ":filament_configurations",
-    ],
-    deps = [
-        "//common:find_resource",
-        "//geometry:shape_specification",
-    ],
-)
-
 drake_cc_binary(
     name = "actuated_curvature",
     srcs = ["actuated_curvature.cc"],
@@ -101,6 +82,14 @@ drake_cc_binary(
 )
 
 drake_jupyter_py_binary(
+    name = "capstan_effect",
+    add_test_rule = 0,
+    deps = [
+        "//bindings/pydrake",
+    ],
+)
+
+drake_jupyter_py_binary(
     name = "conveyor_belt",
     add_test_rule = 0,
     deps = [
@@ -109,7 +98,15 @@ drake_jupyter_py_binary(
 )
 
 drake_jupyter_py_binary(
-    name = "crowned_pulley_belt",
+    name = "crowned_pulley_DER",
+    add_test_rule = 0,
+    deps = [
+        "//bindings/pydrake",
+    ],
+)
+
+drake_jupyter_py_binary(
+    name = "crowned_pulley_FEM",
     add_test_rule = 0,
     deps = [
         "//bindings/pydrake",
@@ -128,18 +125,8 @@ drake_jupyter_py_binary(
 )
 
 drake_cc_binary(
-    name = "filament_hydroelastic_contact",
-    srcs = ["filament_hydroelastic_contact.cc"],
-    deps = [
-        ":filament_common",
-        "//geometry",
-        "//geometry/proximity",
-    ],
-)
-
-drake_cc_binary(
-    name = "filament_hydroelastic_contact2",
-    srcs = ["filament_hydroelastic_contact2.cc"],
+    name = "filament_hydroelastic_vs_point_contact",
+    srcs = ["filament_hydroelastic_vs_point_contact.cc"],
     deps = [
         "//geometry",
         "//geometry/proximity",
@@ -184,18 +171,27 @@ drake_cc_binary(
     ],
 )
 
-drake_cc_binary(
-    name = "knot",
-    srcs = ["knot.cc"],
+drake_jupyter_py_binary(
+    name = "knot_tightening_capsule",
     add_test_rule = 0,
     deps = [
-        ":filament_common",
-        "//geometry:drake_visualizer",
-        "//geometry:scene_graph",
-        "//multibody/plant",
-        "//systems/analysis:simulator",
-        "//systems/framework:diagram",
-        "@gflags",
+        "//bindings/pydrake",
+    ],
+)
+
+drake_jupyter_py_binary(
+    name = "knot_tightening_DER",
+    add_test_rule = 0,
+    deps = [
+        "//bindings/pydrake",
+    ],
+)
+
+drake_jupyter_py_binary(
+    name = "knot_tightening_IMC",
+    add_test_rule = 0,
+    deps = [
+        "//bindings/pydrake",
     ],
 )
 
