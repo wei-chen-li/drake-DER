@@ -182,6 +182,10 @@ class Meshcat {
               See @ref meshcat_path "Meshcat paths" for the semantics.
   @param shape a Shape that specifies the geometry of the object.
   @param rgba an Rgba that specifies the (solid) color of the object.
+  @param time_in_recording (optional). If recording (see StartRecording()), then
+              in addition to publishing the transform to any meshcat browsers
+              immediately, this transform is saved to the current animation at
+              `time_in_recording`.
   @note If `shape` is a mesh, the file referred to can be either an .obj file
   or an _embedded_ .gltf file (it has all geometry data and texture data
   contained within the single .gltf file).
@@ -222,12 +226,17 @@ class Meshcat {
   @param wireframe_line_width is the width in pixels.  Due to limitations in
                               WebGL implementations, the line width may be 1
                               regardless of the set value.
+  @param time_in_recording (optional). If recording (see StartRecording()), then
+              in addition to publishing the transform to any meshcat browsers
+              immediately, this transform is saved to the current animation at
+              `time_in_recording`.
   @pydrake_mkdoc_identifier{triangle_surface_mesh}
   */
   void SetObject(std::string_view path, const TriangleSurfaceMesh<double>& mesh,
                  const Rgba& rgba = Rgba(0.1, 0.1, 0.1, 1.0),
                  bool wireframe = false, double wireframe_line_width = 1.0,
-                 SideOfFaceToRender side = kDoubleSide);
+                 SideOfFaceToRender side = kDoubleSide,
+                 std::optional<double> time_in_recording = std::nullopt);
 
   /** Sets the "object" at `path` in the scene tree to a piecewise-linear
   interpolation between the `vertices`.
@@ -279,7 +288,11 @@ class Meshcat {
                    the faces.
   @param wireframe_line_width is the width in pixels.  Due to limitations in
                               WebGL implementations, the line width may be 1
-                              regardless of the set value. */
+                              regardless of the set value.
+  @param time_in_recording (optional). If recording (see StartRecording()), then
+              in addition to publishing the transform to any meshcat browsers
+              immediately, this transform is saved to the current animation at
+              `time_in_recording`. */
   void SetTriangleMesh(std::string_view path,
                        const Eigen::Ref<const Eigen::Matrix3Xd>& vertices,
                        const Eigen::Ref<const Eigen::Matrix3Xi>& faces,

@@ -282,11 +282,13 @@ void DefineMeshcat(py::module m) {
         .def("SetObject",
             py::overload_cast<std::string_view,
                 const TriangleSurfaceMesh<double>&, const Rgba&, bool, double,
-                Meshcat::SideOfFaceToRender>(&Class::SetObject),
+                Meshcat::SideOfFaceToRender, std::optional<double>>(
+                &Class::SetObject),
             py::arg("path"), py::arg("mesh"),
             py::arg("rgba") = Rgba(0.1, 0.1, 0.1, 1.0),
             py::arg("wireframe") = false, py::arg("wireframe_line_width") = 1.0,
             py::arg("side") = Meshcat::SideOfFaceToRender::kDoubleSide,
+            py::arg("time_in_recording") = std::nullopt,
             cls_doc.SetObject.doc_triangle_surface_mesh)
         .def("SetLine", &Class::SetLine, py::arg("path"), py::arg("vertices"),
             py::arg("line_width") = 1.0,

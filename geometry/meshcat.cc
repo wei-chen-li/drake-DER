@@ -1136,7 +1136,8 @@ class Meshcat::Impl {
   // This function is public via the PIMPL.
   void SetObject(std::string_view path, const TriangleSurfaceMesh<double>& mesh,
                  const Rgba& rgba, bool wireframe, double wireframe_line_width,
-                 SideOfFaceToRender side) {
+                 SideOfFaceToRender side,
+                 std::optional<double> time_in_recording) {
     DRAKE_DEMAND(IsThread(main_thread_id_));
     Eigen::Matrix3Xd vertices(3, mesh.num_vertices());
     for (int i = 0; i < mesh.num_vertices(); ++i) {
@@ -1150,7 +1151,7 @@ class Meshcat::Impl {
       }
     }
     SetTriangleMesh(path, vertices, faces, rgba, wireframe,
-                    wireframe_line_width, side);
+                    wireframe_line_width, side, time_in_recording);
   }
 
   // This function is public via the PIMPL.
@@ -2654,8 +2655,10 @@ void Meshcat::SetObject(std::string_view path,
 void Meshcat::SetObject(std::string_view path,
                         const TriangleSurfaceMesh<double>& mesh,
                         const Rgba& rgba, bool wireframe,
-                        double wireframe_line_width, SideOfFaceToRender side) {
-  impl().SetObject(path, mesh, rgba, wireframe, wireframe_line_width, side);
+                        double wireframe_line_width, SideOfFaceToRender side,
+                        std::optional<double> time_in_recording) {
+  impl().SetObject(path, mesh, rgba, wireframe, wireframe_line_width, side,
+                   time_in_recording);
 }
 
 void Meshcat::SetLine(std::string_view path,
