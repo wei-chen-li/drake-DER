@@ -212,6 +212,7 @@ void do_main() {
 }  // namespace drake
 
 int main(int argc, char* argv[]) {
+  gflags::SetUsageMessage("");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   drake::examples::filament::do_main();
   return 0;

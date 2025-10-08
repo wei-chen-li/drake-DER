@@ -1,5 +1,6 @@
 #include "drake/multibody/der/constraint_participation.h"
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 

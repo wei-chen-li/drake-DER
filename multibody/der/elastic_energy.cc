@@ -896,7 +896,11 @@ void AddBendingEnergyHessian(const DerStructuralProperty<T>& prop,
 
 DRAKE_DEFINE_FUNCTION_TEMPLATE_INSTANTIATIONS_ON_DEFAULT_SCALARS(
     (&ComputeElasticEnergy<T>, &ComputeElasticEnergyJacobian<T>,
-     &ComputeElasticEnergyHessian<T>));
+     &ComputeElasticEnergyHessian<T>, &ComputeStretchingEnergy<T>,
+     &AddStretchingEnergyJacobian<T>, &AddStretchingEnergyHessian<T>,
+     &ComputeTwistingEnergy<T>, &AddTwistingEnergyJacobian<T>,
+     &AddTwistingEnergyHessian<T>, &ComputeBendingEnergy<T>,
+     &AddBendingEnergyJacobian<T>, &AddBendingEnergyHessian<T>));
 
 }  // namespace internal
 }  // namespace der

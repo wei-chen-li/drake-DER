@@ -188,12 +188,7 @@ int do_main() {
 }  // namespace drake
 
 int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage(
-      "This is a demo used to showcase the undeformed curvature of a filament. "
-      "The default undeformed curvature of a filament with closed ends is set "
-      "to that of a circle. Therefore, even with a non-circular initial shape, "
-      "the filament should eventually settle as circle. Refer to README for "
-      "instructions on meldis as well as optional flags.");
+  gflags::SetUsageMessage("");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   return drake::examples::filament::do_main();
 }

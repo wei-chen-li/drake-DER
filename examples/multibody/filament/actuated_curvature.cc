@@ -151,10 +151,7 @@ int do_main() {
 }  // namespace drake
 
 int main(int argc, char* argv[]) {
-  gflags::SetUsageMessage(
-      "This is a demo used to showcase a filament curling up by modifying the "
-      "undeformed curvature. Refer to README for instructions on meldis as "
-      "well as optional flags.");
+  gflags::SetUsageMessage("");
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   return drake::examples::filament::do_main();
 }
