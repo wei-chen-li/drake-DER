@@ -2,6 +2,7 @@ import warnings
 
 # Normal symbols.
 from .inverse_kinematics import *  # noqa
+from .der import *  # noqa
 from .fem import *  # noqa
 from .math import *  # noqa
 from .meshcat import *  # noqa

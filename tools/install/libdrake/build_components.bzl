@@ -57,6 +57,7 @@ LIBDRAKE_COMPONENTS = [
     "//multibody/benchmarks/pendulum",
     "//multibody/contact_solvers",
     "//multibody/contact_solvers/sap",
+    "//multibody/der",
     "//multibody/fem",
     "//multibody/hydroelastics",
     "//multibody/inverse_kinematics",
