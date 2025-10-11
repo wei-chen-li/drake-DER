@@ -195,6 +195,22 @@ drake_jupyter_py_binary(
     ],
 )
 
+drake_jupyter_py_binary(
+    name = "ring_chain",
+    add_test_rule = 0,
+    deps = [
+        "//bindings/pydrake",
+    ],
+)
+
+drake_jupyter_py_binary(
+    name = "shoelace_tying",
+    add_test_rule = 0,
+    deps = [
+        "//bindings/pydrake",
+    ],
+)
+
 drake_cc_binary(
     name = "simply_supported_beam",
     srcs = ["simply_supported_beam.cc"],
