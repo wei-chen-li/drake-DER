@@ -116,7 +116,7 @@ void RegisterBall(MultibodyPlant<double>* plant) {
   const RigidBody<double>& ball =
       plant->AddRigidBody("ball", SpatialInertia<double>::SolidSphereWithMass(
                                       FLAGS_ball_mass, FLAGS_ball_radius));
-  plant->SetDefaultFreeBodyPose(
+  plant->SetDefaultFloatingBaseBodyPose(
       ball, RigidTransformd(RotationMatrixd(),
                             Vector3d(FLAGS_length * 0.9, -FLAGS_width / 2, 2)));
   plant->RegisterVisualGeometry(ball, RigidTransformd::Identity(),

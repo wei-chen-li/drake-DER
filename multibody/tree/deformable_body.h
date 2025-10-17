@@ -500,7 +500,7 @@ class DeformableBody final : public MultibodyElement<T> {
                         const geometry::Filament& filament_G,
                         const fem::DeformableBodyConfig<T>& config);
 
-  void DoSetTopology(const internal::MultibodyTreeTopology&) final {
+  void DoSetTopology() final {
     /* No-op because deformable bodies are not part of the MultibodyTree
      topology. */
   }

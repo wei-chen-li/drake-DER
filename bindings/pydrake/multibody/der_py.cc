@@ -1,7 +1,7 @@
+#include "drake/bindings/generated_docstrings/multibody_der.h"
 #include "drake/bindings/pydrake/common/cpp_template_pybind.h"
 #include "drake/bindings/pydrake/common/default_scalars_pybind.h"
 #include "drake/bindings/pydrake/common/type_pack.h"
-#include "drake/bindings/pydrake/documentation_pybind.h"
 #include "drake/bindings/pydrake/pydrake_pybind.h"
 #include "drake/common/default_scalars.h"
 #include "drake/multibody/der/der_model.h"
@@ -16,7 +16,7 @@ void DoScalarDependentDefinitions(py::module m, T) {
 
   // NOLINTNEXTLINE(build/namespaces): Emulate placement in namespace.
   using namespace drake::multibody::der;
-  constexpr auto& doc = pydrake_doc.drake.multibody.der;
+  constexpr auto& doc = pydrake_doc_multibody_der.drake.multibody.der;
 
   {
     using Class = DerStructuralProperty<T>;

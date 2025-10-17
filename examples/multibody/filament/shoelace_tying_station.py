@@ -1,20 +1,46 @@
 import numpy as np
-from pydrake.all import (AddCompliantHydroelasticProperties,
-                         AddContactMaterial, Box, BusCreator, Capsule,
-                         CollisionCheckerParams, CollisionFilterDeclaration,
-                         ConstantVectorSource, Convex, CoulombFriction,
-                         DeformableBodyConfig, Demultiplexer, Diagram,
-                         DiagramBuilder,
-                         DifferentialInverseKinematicsController,
-                         DifferentialInverseKinematicsSystem, DofMask,
-                         Filament, FixedOffsetFrame, ForceDensityField,
-                         GeometryInstance, GeometrySet, IllustrationProperties,
-                         JointLimits, JointStiffnessController, LeafSystem,
-                         LinearBushingRollPitchYaw, Mesh, Multiplexer,
-                         Parallelism, PassThrough, ProximityProperties, Rgba,
-                         RigidTransform, RobotDiagramBuilder, RotationMatrix,
-                         SceneGraphCollisionChecker, SpatialInertia,
-                         SpatialVelocity, Value)
+from pydrake.all import (
+    AddCompliantHydroelasticProperties,
+    AddContactMaterial,
+    Box,
+    BusCreator,
+    Capsule,
+    CollisionCheckerParams,
+    CollisionFilterDeclaration,
+    ConstantVectorSource,
+    Convex,
+    CoulombFriction,
+    DeformableBodyConfig,
+    Demultiplexer,
+    Diagram,
+    DiagramBuilder,
+    DifferentialInverseKinematicsController,
+    DifferentialInverseKinematicsSystem,
+    DofMask,
+    Filament,
+    FixedOffsetFrame,
+    ForceDensityField,
+    GeometryInstance,
+    GeometrySet,
+    IllustrationProperties,
+    JointLimits,
+    JointStiffnessController,
+    LeafSystem,
+    LinearBushingRollPitchYaw,
+    Mesh,
+    Multiplexer,
+    Parallelism,
+    PassThrough,
+    ProximityProperties,
+    Rgba,
+    RigidTransform,
+    RobotDiagramBuilder,
+    RotationMatrix,
+    SceneGraphCollisionChecker,
+    SpatialInertia,
+    SpatialVelocity,
+    Value,
+)
 
 
 class ShoelaceTyingStation(Diagram):
@@ -46,10 +72,19 @@ class ShoelaceTyingStation(Diagram):
         plant = robot_diagram.plant()
 
         # Set the default configuration of the arms
-        q0 = [0.0, -np.pi / 4, 0.0, -3 * np.pi / 4, 0.0, np.pi / 2, np.pi / 4,
-              0.04, 0.04] * 2
+        q0 = [
+            0.0,
+            -np.pi / 4,
+            0.0,
+            -3 * np.pi / 4,
+            0.0,
+            np.pi / 2,
+            np.pi / 4,
+            0.04,
+            0.04,
+        ] * 2
         positions0 = plant.GetDefaultPositions()
-        positions0[0:len(q0)] = q0
+        positions0[0 : len(q0)] = q0
         plant.SetDefaultPositions(positions0)
         active_dof = DofMask(([True] * 7 + [False] * 2) * 2)
 
@@ -69,10 +104,12 @@ class ShoelaceTyingStation(Diagram):
                 )
             )
         )
+        JointVelocityLimitConstraint = (
+            DifferentialInverseKinematicsSystem.JointVelocityLimitConstraint
+        )
         recipe.AddIngredient(
-            DifferentialInverseKinematicsSystem.JointVelocityLimitConstraint(
-                DifferentialInverseKinematicsSystem.JointVelocityLimitConstraint
-                .Config(),
+            JointVelocityLimitConstraint(
+                JointVelocityLimitConstraint.Config(),
                 JointLimits(simplified_plant, active_dof),
             )
         )
@@ -130,14 +167,18 @@ class ShoelaceTyingStation(Diagram):
             ),
             demux2.get_input_port(),
         )
-        builder.Connect(demux1.get_output_port(0),
-                        arm_state_mux.get_input_port(0))
-        builder.Connect(demux1.get_output_port(1),
-                        arm_state_mux.get_input_port(2))
-        builder.Connect(demux2.get_output_port(0),
-                        arm_state_mux.get_input_port(1))
-        builder.Connect(demux2.get_output_port(1),
-                        arm_state_mux.get_input_port(3))
+        builder.Connect(
+            demux1.get_output_port(0), arm_state_mux.get_input_port(0)
+        )
+        builder.Connect(
+            demux1.get_output_port(1), arm_state_mux.get_input_port(2)
+        )
+        builder.Connect(
+            demux2.get_output_port(0), arm_state_mux.get_input_port(1)
+        )
+        builder.Connect(
+            demux2.get_output_port(1), arm_state_mux.get_input_port(3)
+        )
 
         builder.Connect(
             arm_state_mux.get_output_port(),
@@ -169,7 +210,7 @@ class ShoelaceTyingStation(Diagram):
         builder.Connect(demux1.get_output_port(1), mux.get_input_port(2))
         builder.Connect(
             right_hand_finger_controller.get_output_port(),
-            mux.get_input_port(3)
+            mux.get_input_port(3),
         )
         builder.Connect(demux2.get_output_port(0), mux.get_input_port(4))
         builder.Connect(demux2.get_output_port(1), mux.get_input_port(6))
@@ -213,20 +254,20 @@ class ShoelaceTyingStation(Diagram):
 
         # Connect pass through system to provide default poses
         plant_context = plant.CreateDefaultContext()
-        X_WH_left = plant.GetFrameByName("panda_hand",
-                                         left_arm).CalcPoseInWorld(
-            plant_context
-        )
-        X_WH_right = plant.GetFrameByName("panda_hand",
-                                          right_arm).CalcPoseInWorld(
-            plant_context
-        )
+        X_WH_left = plant.GetFrameByName(
+            "panda_hand", left_arm
+        ).CalcPoseInWorld(plant_context)
+        X_WH_right = plant.GetFrameByName(
+            "panda_hand", right_arm
+        ).CalcPoseInWorld(plant_context)
         pass_through1 = builder.AddSystem(PassThrough(Value(X_WH_left)))
         pass_through2 = builder.AddSystem(PassThrough(Value(X_WH_right)))
-        builder.Connect(pass_through1.get_output_port(),
-                        bus_creator.get_input_port(0))
-        builder.Connect(pass_through2.get_output_port(),
-                        bus_creator.get_input_port(1))
+        builder.Connect(
+            pass_through1.get_output_port(), bus_creator.get_input_port(0)
+        )
+        builder.Connect(
+            pass_through2.get_output_port(), bus_creator.get_input_port(1)
+        )
 
         # Export input ports
         builder.ExportInput(pass_through1.get_input_port(), "left_hand_pose")
@@ -241,7 +282,7 @@ class ShoelaceTyingStation(Diagram):
         # Export output ports
         builder.ExportOutput(
             robot_diagram.GetOutputPort("scene_graph_query"),
-            "scene_graph_query"
+            "scene_graph_query",
         )
 
         # Build the diagram
@@ -271,21 +312,33 @@ class ShoelaceTyingStation(Diagram):
         self.ValidateContext(context)
         plant = self._robot_diagram.plant()
         plant_context = self.GetSubsystemContext(plant, context)
-        left_hand_finger1 = plant.GetJointByName("panda_finger_joint1",
-                                                 self._left_arm)
-        left_hand_finger2 = plant.GetJointByName("panda_finger_joint2",
-                                                 self._left_arm)
-        left_hand_grasp = (
-            1.0 - (left_hand_finger1.GetOnePosition(plant_context)
-                   + left_hand_finger2.GetOnePosition(plant_context)) / 0.08
+        left_hand_finger1 = plant.GetJointByName(
+            "panda_finger_joint1", self._left_arm
         )
-        right_hand_finger1 = plant.GetJointByName("panda_finger_joint1",
-                                                  self._left_arm)
-        right_hand_finger2 = plant.GetJointByName("panda_finger_joint2",
-                                                  self._left_arm)
+        left_hand_finger2 = plant.GetJointByName(
+            "panda_finger_joint2", self._left_arm
+        )
+        left_hand_grasp = (
+            1.0
+            - (
+                left_hand_finger1.GetOnePosition(plant_context)
+                + left_hand_finger2.GetOnePosition(plant_context)
+            )
+            / 0.08
+        )
+        right_hand_finger1 = plant.GetJointByName(
+            "panda_finger_joint1", self._left_arm
+        )
+        right_hand_finger2 = plant.GetJointByName(
+            "panda_finger_joint2", self._left_arm
+        )
         right_hand_grasp = (
-            1.0 - (right_hand_finger1.GetOnePosition(plant_context)
-                   + right_hand_finger2.GetOnePosition(plant_context)) / 0.08
+            1.0
+            - (
+                right_hand_finger1.GetOnePosition(plant_context)
+                + right_hand_finger2.GetOnePosition(plant_context)
+            )
+            / 0.08
         )
         return left_hand_grasp, right_hand_grasp
 
@@ -304,7 +357,7 @@ class ShoelaceTyingStation(Diagram):
         self.ValidateContext(context)
         plant = self._robot_diagram.plant()
         plant_context = self.GetSubsystemContext(plant, context)
-        E = plant.CalcPotentialEnergy(plant_context)
+        E = 0
         for body in self._shoelace_bodies:
             E += body.CalcElasticEnergy(plant_context)
         return E
@@ -322,8 +375,11 @@ def AddRobotArms(robot_builder):
         ground, RigidTransform(), Box(10, 10, 0.2), "ground", [0.7, 0.7, 0.7, 1]
     )
     ground_geom_id = plant.RegisterCollisionGeometry(
-        ground, RigidTransform(), Box(10, 10, 0.2), "ground",
-        CoulombFriction(0.1, 0.1)
+        ground,
+        RigidTransform(),
+        Box(10, 10, 0.2),
+        "ground",
+        CoulombFriction(0.1, 0.1),
     )
 
     # Add robotic arm to plant
@@ -362,8 +418,9 @@ def AddShoe(
     plant = robot_builder.plant()
     model_instance = plant.AddModelInstance("model")
     shoe = plant.AddRigidBody("shoe", model_instance)
-    X_WS = RigidTransform(RotationMatrix.MakeZRotation(-np.pi / 2),
-                          [0.016, 0, 0.062])
+    X_WS = RigidTransform(
+        RotationMatrix.MakeZRotation(-np.pi / 2), [0.016, 0, 0.062]
+    )
     plant.WeldFrames(plant.world_frame(), shoe.body_frame(), X_WS)
     shape = Mesh("models/shoe.gltf", 0.06)
     plant.RegisterVisualGeometry(
@@ -404,8 +461,10 @@ def AddShoe(
                 name,
                 left_lace_model_instance,
                 SpatialInertia.SolidCapsuleWithDensity(
-                    lace_mass_density, lace_diameter / 2,
-                    lace_edge_length, [0, 0, 1]
+                    lace_mass_density,
+                    lace_diameter / 2,
+                    lace_edge_length,
+                    [0, 0, 1],
                 ),
             )
             capsule = Capsule(lace_diameter / 2, lace_edge_length)
@@ -423,7 +482,7 @@ def AddShoe(
             if i == 0:
                 plant.WeldFrames(plant.world_frame(), link.body_frame(), tf)
             else:
-                plant.SetDefaultFreeBodyPose(link, tf)
+                plant.SetDefaultFloatingBaseBodyPose(link, tf)
             left_lace_head_frame.append(
                 plant.AddFrame(
                     FixedOffsetFrame(
@@ -446,8 +505,9 @@ def AddShoe(
         for i in range(len(left_lace_geom_id) - 1):
             collision_filter_manager.Apply(
                 CollisionFilterDeclaration().ExcludeWithin(
-                    GeometrySet([left_lace_geom_id[i],
-                                 left_lace_geom_id[i + 1]])
+                    GeometrySet(
+                        [left_lace_geom_id[i], left_lace_geom_id[i + 1]]
+                    )
                 )
             )
             plant.AddForceElement(
@@ -472,8 +532,10 @@ def AddShoe(
                 name,
                 right_lace_model_instance,
                 SpatialInertia.SolidCapsuleWithDensity(
-                    lace_mass_density, lace_diameter / 2,
-                    lace_edge_length, [0, 0, 1]
+                    lace_mass_density,
+                    lace_diameter / 2,
+                    lace_edge_length,
+                    [0, 0, 1],
                 ),
             )
             capsule = Capsule(lace_diameter / 2, lace_edge_length)
@@ -491,7 +553,7 @@ def AddShoe(
             if i == 0:
                 plant.WeldFrames(plant.world_frame(), link.body_frame(), tf)
             else:
-                plant.SetDefaultFreeBodyPose(link, tf)
+                plant.SetDefaultFloatingBaseBodyPose(link, tf)
             right_lace_head_frame.append(
                 plant.AddFrame(
                     FixedOffsetFrame(
@@ -514,8 +576,9 @@ def AddShoe(
         for i in range(len(right_lace_geom_id) - 1):
             collision_filter_manager.Apply(
                 CollisionFilterDeclaration().ExcludeWithin(
-                    GeometrySet([right_lace_geom_id[i],
-                                 right_lace_geom_id[i + 1]])
+                    GeometrySet(
+                        [right_lace_geom_id[i], right_lace_geom_id[i + 1]]
+                    )
                 )
             )
             plant.AddForceElement(
@@ -658,7 +721,7 @@ def AddProximityProperties(
     proximity_props.AddProperty(
         "hydroelastic",
         "longitudinal_resolution_hint",
-        longitudinal_resolution_hint
+        longitudinal_resolution_hint,
     )
     AddContactMaterial(
         properties=proximity_props,
@@ -677,8 +740,9 @@ class FingerController(LeafSystem):
 
     def CalcOutput(self, context, output):
         input_port = self.get_input_port()
-        grasp = (input_port.Eval(context)[0]
-                 if input_port.HasValue(context) else 0.0)
+        grasp = (
+            input_port.Eval(context)[0] if input_port.HasValue(context) else 0.0
+        )
         grasp = max(0.0, min(1.0, grasp))
         output.SetFromVector((1.0 - grasp) * 0.04 * np.ones(2))
 
@@ -723,8 +787,13 @@ class FictiousFloor(ForceDensityField):
 
     def DoClone(self):
         return FictiousFloor(
-            self._n_WF, self._p_WF, self._rho,
-            self._k, self._d, self._mu, self._K
+            self._n_WF,
+            self._p_WF,
+            self._rho,
+            self._k,
+            self._d,
+            self._mu,
+            self._K,
         )
 
 
