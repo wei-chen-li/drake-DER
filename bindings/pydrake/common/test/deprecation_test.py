@@ -24,8 +24,11 @@ class TestDeprecation(unittest.TestCase):
         # Remove the module.
         import deprecation_example as mod
 
+        # Python versions differ on whether binding an object to a local
+        # variable increases the ref count.
+        tare = sys.getrefcount(mod)
         del sys.modules[mod.__name__]
-        self.assertEqual(sys.getrefcount(mod), 2)
+        self.assertEqual(sys.getrefcount(mod), tare - 1)
 
     def test_module_nominal(self):
         # Test reading and writing as one would do with a normal module.
@@ -69,8 +72,8 @@ class TestDeprecation(unittest.TestCase):
     def test_module_import_from_all(self):
         # N.B. This is done in another module because `from x import *` is not
         # well supported for `exec`.
-        import deprecation_example.import_all
-        import deprecation_example
+        import deprecation_example.import_all  # ruff: isort: skip
+        import deprecation_example  # ruff: isort: skip
 
         self.assertIsInstance(deprecation_example.sub_module, str)
 

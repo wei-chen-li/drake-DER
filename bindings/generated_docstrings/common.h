@@ -1084,7 +1084,7 @@ characters.)""";
       struct /* filename_hint */ {
         // Source: drake/common/memory_file.h
         const char* doc =
-R"""(Returns the notional "filename" for this file`.)""";
+R"""(Returns the notional "filename" for this ``file``.)""";
       } filename_hint;
       // Symbol: drake::MemoryFile::sha256
       struct /* sha256 */ {
@@ -2994,7 +2994,10 @@ Note:
 R"""(Returns ``fmt::to_string(x)`` but always with at least one digit after
 the decimal point. Different versions of fmt disagree on whether to
 omit the trailing ".0" when formatting integer-valued floating-point
-numbers.)""";
+numbers.
+
+Template parameter ``T``:
+    must be either ``float`` or ``double``.)""";
     } fmt_floating_point;
     // Symbol: drake::fmt_runtime
     struct /* fmt_runtime */ {

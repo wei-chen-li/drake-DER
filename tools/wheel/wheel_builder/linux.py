@@ -2,25 +2,24 @@
 # //tools/wheel:builder for the user interface.
 
 import atexit
+from datetime import datetime, timezone
 import os
 import pathlib
 import subprocess
 import sys
 import tarfile
 
-from datetime import datetime, timezone
-
 from .common import (
     create_snopt_tgz,
     die,
+    find_tests,
     gripe,
+    resource_root,
     strip_tar_metadata,
     wheel_name,
+    wheelhouse,
 )
-from .common import resource_root, wheelhouse
-from .common import find_tests
-
-from .linux_types import Platform, Role, Target, BUILD, TEST
+from .linux_types import BUILD, TEST, Platform, Role, Target
 
 # Artifacts that need to be cleaned up. DO NOT MODIFY outside of this file.
 _files_to_remove = []
@@ -34,7 +33,9 @@ tag_base = "pip-drake"
 # Python version, must be unique.
 targets = (
     # NOTE: adding or removing a python version?  Please update the artifact
-    # tallies in doc/_pages/release_playbook.md (search `Attach binaries`).
+    # tallies in doc/_pages/release_playbook.md (search `Attach binaries`)
+    # and, if necessary, the set of Python versions for which lockfiles are
+    # generated in tools/workspace/python/venv_upgrade.
     Target(
         build_platform=Platform("amd64/almalinux", "9", "almalinux9"),
         test_platform=Platform("ubuntu", "22.04", "jammy"),
@@ -55,11 +56,17 @@ targets = (
     ),
     Target(
         build_platform=Platform("amd64/almalinux", "9", "almalinux9"),
-        # TODO(jwnimmer-tri) Switch testing to 25.10 once it's been released,
-        # and then later to 26.04 as the final resting place for 3.13 testing.
-        test_platform=Platform("ubuntu", "25.04", "plucky"),
+        # TODO(jwnimmer-tri) Switch testing to 26.04 once it's been released.
+        test_platform=Platform("ubuntu", "25.10", "questing"),
         python_version_tuple=(3, 13, 0),
         python_sha="086de5882e3cb310d4dca48457522e2e48018ecd43da9cdf827f6a0759efb07d",  # noqa
+    ),
+    Target(
+        build_platform=Platform("amd64/almalinux", "9", "almalinux9"),
+        # TODO(jwnimmer-tri) Switch testing to 26.04 once it's been released.
+        test_platform=Platform("ubuntu", "25.10", "questing"),
+        python_version_tuple=(3, 14, 0),
+        python_sha="2299dae542d395ce3883aca00d3c910307cd68e0b2f7336098c8e7b7eee9f3e9",  # noqa
     ),
 )
 glibc_versions = {

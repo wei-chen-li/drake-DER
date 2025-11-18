@@ -8,10 +8,16 @@ import shutil
 import subprocess
 import tempfile
 
-from .common import create_snopt_tgz, die, wheel_name
-from .common import build_root, resource_root, wheelhouse
-from .common import test_root, find_tests
-
+from .common import (
+    build_root,
+    create_snopt_tgz,
+    die,
+    find_tests,
+    resource_root,
+    test_root,
+    wheel_name,
+    wheelhouse,
+)
 from .macos_types import PythonTarget
 
 # This is the complete set of defined targets (i.e. potential wheels). By
@@ -21,8 +27,12 @@ from .macos_types import PythonTarget
 # These should be kept in sync with
 # `setup/macos/source_distribution/Brewfile-developer`.
 python_targets = (
-    PythonTarget(3, 12),
+    # NOTE: adding or removing a python version?  Please update the artifact
+    # tallies in doc/_pages/release_playbook.md (search `Attach binaries`)
+    # and, if necessary, the set of Python versions for which lockfiles are
+    # generated in tools/workspace/python/venv_upgrade.
     PythonTarget(3, 13),
+    PythonTarget(3, 14),
 )
 
 

@@ -1,4 +1,5 @@
 import numpy as np
+
 from pydrake.all import (
     AddCompliantHydroelasticProperties,
     AddContactMaterial,

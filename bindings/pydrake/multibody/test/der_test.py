@@ -1,6 +1,6 @@
 import unittest
-from pydrake.common.test_utilities import numpy_compare
 
+from pydrake.common.test_utilities import numpy_compare
 from pydrake.multibody.der import (
     DerStructuralProperty_,
     DerUndeformedState_,

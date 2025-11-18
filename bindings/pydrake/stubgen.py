@@ -2,11 +2,11 @@
 
 import importlib
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
 
 from mypy import stubgen
 
@@ -120,11 +120,14 @@ def _wrapper_main():
     hint = "--inner_process"
     if hint not in sys.argv:
         # Call ourself again with a new argument as a hint.
+        env = dict(os.environ)
+        env["PYTHONPATH"] = ":".join(sys.path)
         completed = subprocess.run(
             [sys.executable, "-B"] + sys.argv + [hint],
             encoding="utf-8",
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
+            env=env,
         )
         if completed.returncode != 0:
             sys.stderr.write(completed.stdout)

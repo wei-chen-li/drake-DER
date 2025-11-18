@@ -1,7 +1,7 @@
 """Reports on which of Drake's external dependencies can be updated to a more
 recent version.  This is intended for use by Drake maintainers (only).
 
-This program is only supported on Ubuntu Jammy 22.04.
+This program is only supported on Ubuntu Noble 24.04.
 
 To query GitHub APIs, you'll need to authenticate yourself first.  There are
 two ways to do this:
@@ -31,6 +31,7 @@ command line.
 """
 
 import argparse
+from dataclasses import dataclass
 import getpass
 import hashlib
 import json
@@ -39,11 +40,10 @@ import os
 import re
 import shlex
 import subprocess
-import time
-import urllib
-from dataclasses import dataclass
 from tempfile import TemporaryDirectory
+import time
 from typing import Optional, Set
+import urllib
 
 import git
 import github3
@@ -75,6 +75,7 @@ _IGNORED_REPOSITORIES = [
 # print a reminder to manually check for upgrades.
 _OTHER_REPOSITORIES = [
     "python",
+    "doxygen_internal",
 ]
 
 # For these repositories, ignore any tags that match the specified regex.

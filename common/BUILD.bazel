@@ -15,6 +15,13 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
+filegroup(
+    name = "doxygen_input",
+    srcs = ["cxx_doxygen.h"],
+    tags = ["nolint"],
+    visibility = ["//doc/doxygen_cxx:__pkg__"],
+)
+
 drake_cc_package_library(
     name = "common",
     visibility = ["//visibility:public"],
@@ -89,7 +96,7 @@ drake_cc_library(
 drake_cc_library(
     name = "essential",
     srcs = [
-        "drake_assert_and_throw.cc",
+        "drake_assert.cc",
         "drake_deprecated.cc",
         "text_logging.cc",
     ],
@@ -894,6 +901,7 @@ drake_cc_googletest(
     deps = [
         ":essential",
         "//common/test_utilities:expect_no_throw",
+        "//common/test_utilities:expect_throws_message",
     ],
 )
 

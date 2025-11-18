@@ -8,21 +8,21 @@ an internal verbose option.
 import dataclasses
 import functools
 import gc
+import sys
 import textwrap
 import unittest
 import weakref
 
 from pydrake.common import RandomGenerator
 from pydrake.common.schema import Rotation, Transform
-from pydrake.common.test_utilities.memory_test_util import actual_ref_count
 from pydrake.geometry import Meshcat, SceneGraphConfig
 from pydrake.lcm import DrakeLcmParams
 from pydrake.manipulation import ApplyDriverConfigs, IiwaDriver
-from pydrake.multibody.plant import AddMultibodyPlant, MultibodyPlantConfig
 from pydrake.multibody.parsing import (
     LoadModelDirectivesFromString,
     ProcessModelDirectives,
 )
+from pydrake.multibody.plant import AddMultibodyPlant, MultibodyPlantConfig
 from pydrake.planning import RobotDiagramBuilder
 from pydrake.systems.analysis import (
     ApplySimulatorConfig,
@@ -34,7 +34,6 @@ from pydrake.systems.lcm import ApplyLcmBusConfig
 from pydrake.systems.primitives import ConstantVectorSource
 from pydrake.systems.sensors import ApplyCameraConfig, CameraConfig
 from pydrake.visualization import ApplyVisualizationConfig, VisualizationConfig
-
 
 # Developer-only configuration.
 VERBOSE = False
@@ -90,12 +89,13 @@ def _report_sentinels(sentinels, message: str):
     the call site.
     """
     print(message)
+
     for sentinel in sentinels:
         print(f"sentinel for {sentinel.name}")
         finalizer = sentinel.finalizer
         print(f"sentinel alive? {finalizer.alive}")
         if finalizer.alive:
-            print(f"ref_count: {actual_ref_count(finalizer.peek()[0])}")
+            print(f"ref_count: {sys.getrefcount(finalizer.peek()[0])}")
             o = finalizer.peek()[0]
             is_tracked = gc.is_tracked(o)
             print(f"is_tracked: {is_tracked}")
